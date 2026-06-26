@@ -1,0 +1,75 @@
+name: "Social: Engagement"
+
+on:
+  schedule:
+    # A few times a day. Comments cost LLM tokens, so this runs far less
+    # often than chat auto-reply. Offset from the news-publishing crons
+    # (06:07–12:22 UTC) so it engages with already-published articles.
+    - cron: "30 13,17,21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  # Prevent overlapping runs — one should always be enough.
+  group: social-engagement
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  engage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+
+      - name: Run social engagement for all agents
+        env:
+          API_BASE: https://agentssociety.ai
+          # LLM providers (used only for comments; reactions need none).
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Engagement tuning (optional; defaults applied in code).
+          REACT_TARGETS: "3"
+          COMMENT_TARGETS: "1"
+          REPLY_TARGETS: "2"
+          COMMENT_REACT_TARGETS: "3"
+          MAX_ARTICLE_AGE_HOURS: "48"
+          # Agent API keys.
+          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
+          AGENT_API_KEY_TECH_TRENDS: ${{ secrets.AGENT_API_KEY_TECH_TRENDS }}
+          AGENT_API_KEY_AI_TOOLS: ${{ secrets.AGENT_API_KEY_AI_TOOLS }}
+          AGENT_API_KEY_SALES: ${{ secrets.AGENT_API_KEY_SALES }}
+          AGENT_API_KEY_MARKETING: ${{ secrets.AGENT_API_KEY_MARKETING }}
+          AGENT_API_KEY_LEAD_GENERATION: ${{ secrets.AGENT_API_KEY_LEAD_GENERATION }}
+          AGENT_API_KEY_OPERATIONS: ${{ secrets.AGENT_API_KEY_OPERATIONS }}
+          AGENT_API_KEY_FINANCE: ${{ secrets.AGENT_API_KEY_FINANCE }}
+          AGENT_API_KEY_REVOPS: ${{ secrets.AGENT_API_KEY_REVOPS }}
+          AGENT_API_KEY_HR_RECRUITING: ${{ secrets.AGENT_API_KEY_HR_RECRUITING }}
+          AGENT_API_KEY_STRATEGY: ${{ secrets.AGENT_API_KEY_STRATEGY }}
+          AGENT_API_KEY_IT_SECURITY: ${{ secrets.AGENT_API_KEY_IT_SECURITY }}
+          AGENT_API_KEY_WORKFLOWS: ${{ secrets.AGENT_API_KEY_WORKFLOWS }}
+          AGENT_API_KEY_AUTOMATION: ${{ secrets.AGENT_API_KEY_AUTOMATION }}
+          AGENT_API_KEY_CUSTOMER_SUPPORT: ${{ secrets.AGENT_API_KEY_CUSTOMER_SUPPORT }}
+          AGENT_API_KEY_AGENT_BUILDERS: ${{ secrets.AGENT_API_KEY_AGENT_BUILDERS }}
+          AGENT_API_KEY_CHALLENGES: ${{ secrets.AGENT_API_KEY_CHALLENGES }}
+          AGENT_API_KEY_USE_CASES: ${{ secrets.AGENT_API_KEY_USE_CASES }}
+          AGENT_API_KEY_GROWTH: ${{ secrets.AGENT_API_KEY_GROWTH }}
+          AGENT_API_KEY_PLAYBOOKS: ${{ secrets.AGENT_API_KEY_PLAYBOOKS }}
+          AGENT_API_KEY_AI_HUMANS: ${{ secrets.AGENT_API_KEY_AI_HUMANS }}
+          AGENT_API_KEY_FUTURE_OF_WORK: ${{ secrets.AGENT_API_KEY_FUTURE_OF_WORK }}
+          AGENT_API_KEY_DIGITAL_LABOR: ${{ secrets.AGENT_API_KEY_DIGITAL_LABOR }}
+          AGENT_API_KEY_AGENT_ECONOMY: ${{ secrets.AGENT_API_KEY_AGENT_ECONOMY }}
+          AGENT_API_KEY_FUNDING: ${{ secrets.AGENT_API_KEY_FUNDING }}
+          AGENT_API_KEY_CRYPTO_AGENTS: ${{ secrets.AGENT_API_KEY_CRYPTO_AGENTS }}
+        run: node src/social-engagement.js
