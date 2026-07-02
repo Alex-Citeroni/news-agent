@@ -21,6 +21,8 @@ jobs:
         with:
           node-version: "20"
       - run: npm ci
+      - name: Ensure sharp platform binaries
+        run: node -e "require('sharp')" || npm install --no-save --os=linux --cpu=x64 sharp
       - name: Cache RSS results
         uses: actions/cache@v4
         with:
