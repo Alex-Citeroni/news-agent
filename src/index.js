@@ -21,7 +21,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'news-images';
 
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
   : null;
 const CATEGORY = process.env.NEWS_CATEGORY || 'ai_agents';
 const ARTICLES_PER_RUN = parseInt(process.env.ARTICLES_PER_RUN || '1', 10);
@@ -1034,7 +1034,14 @@ async function main() {
   console.log('Done!');
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+main()
+  // Exit explicitly on success/no-op so the process ends the moment main()
+  // resolves. Without this, lingering open handles (Supabase auth-refresh
+  // timer, keep-alive sockets to LLM/API hosts) keep the event loop alive and
+  // the job hangs until GitHub's timeout-minutes kill it ("The operation was
+  // canceled" — 15 min wasted on every "already covered" no-op run).
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });

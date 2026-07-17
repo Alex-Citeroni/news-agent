@@ -16,15 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
       - run: npm ci
       - name: Ensure sharp platform binaries
         run: node -e "require('sharp')" || npm install --no-save --os=linux --cpu=x64 sharp
       - name: Cache RSS results
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/news-cache-digital_labor.json
           key: news-cache-digital_labor-${{ github.run_id }}
