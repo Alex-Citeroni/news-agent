@@ -1,8 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { RSS_SOURCES, getSourcesForCategory } from './rss-sources.js';
-import { getAllAgents, getRssSources } from './agents-config.js';
+import { getAllAgents, getRssSources, AGENT_KEY_ENV } from './agents-config.js';
 import { isDuplicate } from './dedup.js';
+import { BATCHES, resolveCategories } from './run-news.js';
 
 describe('RSS Sources', () => {
   it('should have at least one default source', () => {
@@ -164,5 +165,45 @@ describe('Environment Config', () => {
   it('ARTICLES_PER_RUN should be a positive number', () => {
     const n = parseInt(process.env.ARTICLES_PER_RUN || '1', 10);
     assert.ok(n > 0 && n <= 10, `ARTICLES_PER_RUN should be 1-10, got ${n}`);
+  });
+});
+
+describe('News batches', () => {
+  const batched = Object.values(BATCHES).flat();
+
+  it('covers every category exactly once', () => {
+    const known = Object.keys(AGENT_KEY_ENV).sort();
+    assert.deepEqual(
+      [...batched].sort(),
+      known,
+      'BATCHES must cover every category in AGENT_KEY_ENV, with no duplicates'
+    );
+  });
+
+  it('every agent has an API key env var mapped', () => {
+    for (const agent of getAllAgents()) {
+      assert.ok(AGENT_KEY_ENV[agent._key], `${agent._key} missing from AGENT_KEY_ENV`);
+    }
+  });
+
+  it('resolveCategories reads an explicit list', () => {
+    assert.deepEqual(
+      resolveCategories({ NEWS_CATEGORIES: 'sales, finance' }),
+      ['sales', 'finance']
+    );
+  });
+
+  it('resolveCategories expands "all"', () => {
+    assert.equal(resolveCategories({ NEWS_CATEGORIES: 'all' }).length, batched.length);
+  });
+
+  it('resolveCategories reads a batch key', () => {
+    assert.deepEqual(resolveCategories({ NEWS_BATCH: '12' }), BATCHES[12]);
+  });
+
+  it('resolveCategories rejects unknown input', () => {
+    assert.throws(() => resolveCategories({ NEWS_CATEGORIES: 'nope' }), /Unknown categories/);
+    assert.throws(() => resolveCategories({ NEWS_BATCH: '99' }), /Unknown NEWS_BATCH/);
+    assert.throws(() => resolveCategories({}), /Nothing to run/);
   });
 });

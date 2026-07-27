@@ -42,7 +42,7 @@
  *   SCAN_OWN_ARTICLES        — own recent articles scanned for replies (default 10)
  */
 
-import { getAgentConfig } from './agents-config.js';
+import { getAgentConfig, AGENT_KEY_ENV } from './agents-config.js';
 import {
   hasLLMProvider,
   callLLMWithRetry,
@@ -70,39 +70,6 @@ const COMMENT_MAX_CHARS = 1000;
  * agents don't appear to be mocking or mourning each other's work.
  */
 const REACTION_EMOJIS = ['🔥', '🚀', '💡', '👏', '🤖', '❤️', '😮'];
-
-/**
- * Map each category to the env var holding its API key.
- * Kept in sync with README.md, chat-autoreply.js, and the per-category workflows.
- */
-const AGENT_KEY_ENV = {
-  ai_agents: 'AGENT_API_KEY',
-  tech_trends: 'AGENT_API_KEY_TECH_TRENDS',
-  new_tools: 'AGENT_API_KEY_AI_TOOLS',
-  sales: 'AGENT_API_KEY_SALES',
-  marketing: 'AGENT_API_KEY_MARKETING',
-  lead_generation: 'AGENT_API_KEY_LEAD_GENERATION',
-  operations: 'AGENT_API_KEY_OPERATIONS',
-  finance: 'AGENT_API_KEY_FINANCE',
-  revops: 'AGENT_API_KEY_REVOPS',
-  hr_recruiting: 'AGENT_API_KEY_HR_RECRUITING',
-  strategy: 'AGENT_API_KEY_STRATEGY',
-  it_security: 'AGENT_API_KEY_IT_SECURITY',
-  workflows: 'AGENT_API_KEY_WORKFLOWS',
-  automation: 'AGENT_API_KEY_AUTOMATION',
-  customer_support: 'AGENT_API_KEY_CUSTOMER_SUPPORT',
-  agent_builders: 'AGENT_API_KEY_AGENT_BUILDERS',
-  challenges: 'AGENT_API_KEY_CHALLENGES',
-  use_cases: 'AGENT_API_KEY_USE_CASES',
-  growth: 'AGENT_API_KEY_GROWTH',
-  playbooks: 'AGENT_API_KEY_PLAYBOOKS',
-  ai_humans: 'AGENT_API_KEY_AI_HUMANS',
-  future_of_work: 'AGENT_API_KEY_FUTURE_OF_WORK',
-  digital_labor: 'AGENT_API_KEY_DIGITAL_LABOR',
-  agent_economy: 'AGENT_API_KEY_AGENT_ECONOMY',
-  funding: 'AGENT_API_KEY_FUNDING',
-  crypto_trading: 'AGENT_API_KEY_CRYPTO_AGENTS',
-};
 
 /** Fetch with timeout. Optionally authenticated. Returns parsed JSON body. */
 async function apiCall(path, { method = 'GET', body, apiKey } = {}) {

@@ -27,9 +27,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - run: npm ci
-      - name: Ensure sharp platform binaries
-        run: node -e "require('sharp')" || npm install --no-save --os=linux --cpu=x64 sharp
+      # No `npm ci`: chat-autoreply.js only imports ./agents-config.js and the
+      # built-in fetch — it has zero npm dependencies. Installing them just
+      # added ~5s and two extra ways for the job to fail.
 
       - name: Run chat autoreply for all agents
         env:

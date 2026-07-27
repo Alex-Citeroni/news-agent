@@ -1,0 +1,126 @@
+name: "News: Publish"
+
+# One job per hourly batch instead of one job per category. The 26 old
+# per-category workflows each paid ~13s of checkout/setup overhead and were
+# billed rounded up to a full minute for ~55s of actual work — 52 min/day for
+# 26 articles. Batching the same categories into 7 hourly jobs cuts that to
+# ~28 min/day while keeping articles spread across the morning.
+#
+# The category → batch mapping lives in src/run-news.js (BATCHES).
+
+on:
+  schedule:
+    # One batch per hour, mirroring the old :07/:22/:37/:52 slots.
+    - cron: "7 6 * * *"
+    - cron: "7 7 * * *"
+    - cron: "7 8 * * *"
+    - cron: "7 9 * * *"
+    - cron: "7 10 * * *"
+    - cron: "7 11 * * *"
+    - cron: "7 12 * * *"
+  workflow_dispatch:
+    inputs:
+      categories:
+        description: "Categories to publish: comma-separated (e.g. sales,finance), or 'all' (26 articles, ~25 min)"
+        required: false
+        default: "all"
+
+concurrency:
+  # Never let a manual run overlap a scheduled batch — the same category
+  # running twice at once could publish the same story twice.
+  group: news-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  publish-news:
+    runs-on: ubuntu-latest
+    # Covers the worst case: a manual "all" run of 26 categories.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: npm ci
+      - name: Ensure sharp platform binaries
+        run: node -e "require('sharp')" || npm install --no-save --os=linux --cpu=x64 sharp
+
+      - name: Resolve batch
+        id: batch
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_CATEGORIES: ${{ inputs.categories }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$INPUT_CATEGORIES" ]; then
+            echo "categories=$INPUT_CATEGORIES" >> "$GITHUB_OUTPUT"
+            echo "label=manual" >> "$GITHUB_OUTPUT"
+          else
+            # All crons are "7 <hour> * * *", so field 2 is the batch key.
+            hour=$(echo "$SCHEDULE" | awk '{print $2}')
+            echo "batch=$hour" >> "$GITHUB_OUTPUT"
+            echo "label=batch$hour" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cache RSS results
+        uses: actions/cache@v5
+        with:
+          # One entry per batch, covering every category file it writes.
+          path: /tmp/news-cache-*.json
+          key: news-cache-${{ steps.batch.outputs.label }}-${{ github.run_id }}
+          restore-keys: |
+            news-cache-${{ steps.batch.outputs.label }}-
+
+      - name: Run news agents
+        env:
+          API_BASE: https://agentssociety.ai
+          NEWS_CATEGORIES: ${{ steps.batch.outputs.categories }}
+          NEWS_BATCH: ${{ steps.batch.outputs.batch }}
+          ARTICLES_PER_RUN: "1"
+          CACHE_DIR: /tmp
+          # Image sources.
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          # LLM providers.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          # Image storage.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Agent API keys — run-news.js picks the right one per category.
+          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
+          AGENT_API_KEY_TECH_TRENDS: ${{ secrets.AGENT_API_KEY_TECH_TRENDS }}
+          AGENT_API_KEY_AI_TOOLS: ${{ secrets.AGENT_API_KEY_AI_TOOLS }}
+          AGENT_API_KEY_SALES: ${{ secrets.AGENT_API_KEY_SALES }}
+          AGENT_API_KEY_MARKETING: ${{ secrets.AGENT_API_KEY_MARKETING }}
+          AGENT_API_KEY_LEAD_GENERATION: ${{ secrets.AGENT_API_KEY_LEAD_GENERATION }}
+          AGENT_API_KEY_OPERATIONS: ${{ secrets.AGENT_API_KEY_OPERATIONS }}
+          AGENT_API_KEY_FINANCE: ${{ secrets.AGENT_API_KEY_FINANCE }}
+          AGENT_API_KEY_REVOPS: ${{ secrets.AGENT_API_KEY_REVOPS }}
+          AGENT_API_KEY_HR_RECRUITING: ${{ secrets.AGENT_API_KEY_HR_RECRUITING }}
+          AGENT_API_KEY_STRATEGY: ${{ secrets.AGENT_API_KEY_STRATEGY }}
+          AGENT_API_KEY_IT_SECURITY: ${{ secrets.AGENT_API_KEY_IT_SECURITY }}
+          AGENT_API_KEY_WORKFLOWS: ${{ secrets.AGENT_API_KEY_WORKFLOWS }}
+          AGENT_API_KEY_AUTOMATION: ${{ secrets.AGENT_API_KEY_AUTOMATION }}
+          AGENT_API_KEY_CUSTOMER_SUPPORT: ${{ secrets.AGENT_API_KEY_CUSTOMER_SUPPORT }}
+          AGENT_API_KEY_AGENT_BUILDERS: ${{ secrets.AGENT_API_KEY_AGENT_BUILDERS }}
+          AGENT_API_KEY_CHALLENGES: ${{ secrets.AGENT_API_KEY_CHALLENGES }}
+          AGENT_API_KEY_USE_CASES: ${{ secrets.AGENT_API_KEY_USE_CASES }}
+          AGENT_API_KEY_GROWTH: ${{ secrets.AGENT_API_KEY_GROWTH }}
+          AGENT_API_KEY_PLAYBOOKS: ${{ secrets.AGENT_API_KEY_PLAYBOOKS }}
+          AGENT_API_KEY_AI_HUMANS: ${{ secrets.AGENT_API_KEY_AI_HUMANS }}
+          AGENT_API_KEY_FUTURE_OF_WORK: ${{ secrets.AGENT_API_KEY_FUTURE_OF_WORK }}
+          AGENT_API_KEY_DIGITAL_LABOR: ${{ secrets.AGENT_API_KEY_DIGITAL_LABOR }}
+          AGENT_API_KEY_AGENT_ECONOMY: ${{ secrets.AGENT_API_KEY_AGENT_ECONOMY }}
+          AGENT_API_KEY_FUNDING: ${{ secrets.AGENT_API_KEY_FUNDING }}
+          AGENT_API_KEY_CRYPTO_AGENTS: ${{ secrets.AGENT_API_KEY_CRYPTO_AGENTS }}
+        run: node src/run-news.js

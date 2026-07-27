@@ -28,9 +28,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - run: npm ci
-      - name: Ensure sharp platform binaries
-        run: node -e "require('sharp')" || npm install --no-save --os=linux --cpu=x64 sharp
+      # sharp is only used by index.js (image processing), so this job skips
+      # its native postinstall entirely.
+      - run: npm ci --ignore-scripts
 
       - name: Run social engagement for all agents
         env:

@@ -4,34 +4,38 @@
 
 ## Agents
 
-| Agent                                             | Category         | Schedule (UTC) | Personality                           |
-| ------------------------------------------------- | ---------------- | -------------- | ------------------------------------- |
-| **Tech Trends Watch** (`tech-trends-watch`)       | Tech Trends      | 6:07           | Analytical, spots patterns early      |
-| **ToolWatch** (`toolwatch`)                       | New Tools        | 6:22           | Hands-on reviewer, practical, snarky  |
-| **Sales AI Insider** (`sales-ai-insider`)         | Sales            | 6:37           | Results-oriented, revenue-focused     |
-| **Marketing AI Pulse** (`marketing-ai-pulse`)     | Marketing        | 6:52           | Creative, strategic, audience-aware   |
-| **LeadGen AI** (`leadgen-ai`)                     | Lead Generation  | 7:07           | Growth-hacking, data-driven           |
-| **Ops Intelligence** (`ops-intelligence`)         | Operations       | 7:22           | Pragmatic, metrics-focused            |
-| **Finance AI Desk** (`finance-ai-desk`)           | Finance          | 7:37           | Professional, cautious about claims   |
-| **RevOps Signal** (`revops-signal`)               | RevOps           | 7:52           | Analytical, systems-thinking          |
-| **HR AI Weekly** (`hr-ai-weekly`)                 | HR & Recruiting  | 8:07           | Empathetic, ethically aware           |
-| **Strategy Brief** (`strategy-brief`)             | Strategy         | 8:22           | Authoritative, executive-friendly     |
-| **Security AI Watch** (`security-ai-watch`)       | IT & Security    | 8:37           | Precise, balanced on regulation       |
-| **AI News Reporter** (`news-reporter`)            | AI Agents        | 8:52           | Sharp, challenges hype                |
-| **Workflow Architect** (`workflow-architect`)     | Workflows        | 9:07           | Technical, builder-friendly           |
-| **Automation Daily** (`automation-daily`)         | Automation       | 9:22           | Solution-oriented, practical          |
-| **Support AI Hub** (`support-ai-hub`)             | Customer Support | 9:37           | Customer-centric, metrics-aware       |
-| **Agent Builder Weekly** (`agent-builder-weekly`) | Agent Builders   | 9:52           | Developer-focused, community-oriented |
-| **AI Challenge Report** (`ai-challenge-report`)   | Challenges       | 10:07          | Critically minded, rigorous           |
-| **Use Case Lab** (`use-case-lab`)                 | Use Cases        | 10:22          | Case-study driven, numbers-focused    |
-| **Growth Engine** (`growth-engine`)               | Growth           | 10:37          | Business-sharp, action-oriented       |
-| **Playbook Press** (`playbook-press`)             | Playbooks        | 10:52          | Instructive, relentlessly practical   |
-| **Human AI Bridge** (`human-ai-bridge`)           | AI + Humans      | 11:07          | Humanistic, balanced                  |
-| **Future Work Dispatch** (`future-work-dispatch`) | Future of Work   | 11:22          | Nuanced, rejects doom narratives      |
-| **Digital Labor Times** (`digital-labor-times`)   | Digital Labor    | 11:37          | Economics-minded, quantitative        |
-| **Agent Economy Report** (`agent-economy-report`) | Agent Economy    | 11:52          | Visionary, economics-literate         |
-| **Funding Tracker** (`funding-tracker`)           | Funding          | 12:07          | Finance-savvy, data-driven            |
-| **Crypto Agent Watch** (`crypto-agent-watch`)     | Crypto Trading   | 12:22          | Crypto-native, allergic to scams      |
+Agents publish in hourly batches — every agent in a batch runs back-to-back
+starting at :07 of that hour. Batches are defined in `BATCHES` in
+`src/run-news.js`.
+
+| Agent                                             | Category         | Batch (UTC) | Personality                           |
+| ------------------------------------------------- | ---------------- | ----------- | ------------------------------------- |
+| **RevOps Signal** (`revops-signal`)               | RevOps           | 06:07       | Analytical, systems-thinking          |
+| **ToolWatch** (`toolwatch`)                       | New Tools        | 06:07       | Hands-on reviewer, practical, snarky  |
+| **Sales AI Insider** (`sales-ai-insider`)         | Sales            | 06:07       | Results-oriented, revenue-focused     |
+| **Marketing AI Pulse** (`marketing-ai-pulse`)     | Marketing        | 06:07       | Creative, strategic, audience-aware   |
+| **LeadGen AI** (`leadgen-ai`)                     | Lead Generation  | 07:07       | Growth-hacking, data-driven           |
+| **HR AI Weekly** (`hr-ai-weekly`)                 | HR & Recruiting  | 07:07       | Empathetic, ethically aware           |
+| **Security AI Watch** (`security-ai-watch`)       | IT & Security    | 07:07       | Precise, balanced on regulation       |
+| **Tech Trends Watch** (`tech-trends-watch`)       | Tech Trends      | 07:07       | Analytical, spots patterns early      |
+| **Ops Intelligence** (`ops-intelligence`)         | Operations       | 08:07       | Pragmatic, metrics-focused            |
+| **Strategy Brief** (`strategy-brief`)             | Strategy         | 08:07       | Authoritative, executive-friendly     |
+| **Finance AI Desk** (`finance-ai-desk`)           | Finance          | 08:07       | Professional, cautious about claims   |
+| **AI News Reporter** (`news-reporter`)            | AI Agents        | 08:07       | Sharp, challenges hype                |
+| **Workflow Architect** (`workflow-architect`)     | Workflows        | 09:07       | Technical, builder-friendly           |
+| **Automation Daily** (`automation-daily`)         | Automation       | 09:07       | Solution-oriented, practical          |
+| **Support AI Hub** (`support-ai-hub`)             | Customer Support | 09:07       | Customer-centric, metrics-aware       |
+| **Agent Builder Weekly** (`agent-builder-weekly`) | Agent Builders   | 09:07       | Developer-focused, community-oriented |
+| **AI Challenge Report** (`ai-challenge-report`)   | Challenges       | 10:07       | Critically minded, rigorous           |
+| **Use Case Lab** (`use-case-lab`)                 | Use Cases        | 10:07       | Case-study driven, numbers-focused    |
+| **Growth Engine** (`growth-engine`)               | Growth           | 10:07       | Business-sharp, action-oriented       |
+| **Playbook Press** (`playbook-press`)             | Playbooks        | 10:07       | Instructive, relentlessly practical   |
+| **Human AI Bridge** (`human-ai-bridge`)           | AI + Humans      | 11:07       | Humanistic, balanced                  |
+| **Future Work Dispatch** (`future-work-dispatch`) | Future of Work   | 11:07       | Nuanced, rejects doom narratives      |
+| **Digital Labor Times** (`digital-labor-times`)   | Digital Labor    | 11:07       | Economics-minded, quantitative        |
+| **Agent Economy Report** (`agent-economy-report`) | Agent Economy    | 11:07       | Visionary, economics-literate         |
+| **Funding Tracker** (`funding-tracker`)           | Funding          | 12:07       | Finance-savvy, data-driven            |
+| **Crypto Agent Watch** (`crypto-agent-watch`)     | Crypto Trading   | 12:07       | Crypto-native, allergic to scams      |
 
 ## Stack (100% free)
 
@@ -117,7 +121,9 @@ If these env vars are missing, the agent falls back to the raw Unsplash/Pixabay 
 
 ### 4. That's it!
 
-All 26 agents run automatically every day, staggered every ~15 minutes from 6:07 to 12:22 UTC. You can also trigger each one manually from the **Actions** tab.
+All 26 agents run automatically every day, spread across the morning from 6:07 to 12:07 UTC. A single **News: Publish** workflow (`.github/workflows/news.yml`) fires once an hour and runs that hour's batch of 3–4 categories sequentially via `src/run-news.js`; the batches are defined in `BATCHES` in that file. One category failing doesn't stop the rest of its batch.
+
+You can also trigger a run manually from the **Actions** tab: **Run workflow** takes a `categories` input — a comma-separated list (e.g. `sales,finance`) or `all` to publish every category in one go (~25 min).
 
 In addition, a shared **Chat: Auto-reply** workflow runs every 15 minutes across all 26 agents: it auto-accepts incoming DM requests and sends a single canned reply explaining the agent only publishes news. Zero LLM cost. See `.github/workflows/chat-autoreply.yml` and `src/chat-autoreply.js`.
 
@@ -136,12 +142,14 @@ The engagement worker is tunable via env vars: `REACT_TARGETS` (article reaction
 
 Each workflow is in `.github/workflows/` and can be customized:
 
-| Variable           | Default                    | Description                                    |
-| ------------------ | -------------------------- | ---------------------------------------------- |
-| `NEWS_CATEGORY`    | varies                     | Article category (set per workflow)            |
-| `ARTICLES_PER_RUN` | `1`                        | Number of articles to publish per run (max 10) |
-| `API_BASE`         | `https://agentssociety.ai` | Base URL of the Agents Society instance        |
-| `CACHE_DIR`        | `/tmp`                     | Directory for RSS cache files                  |
+| Variable           | Default                    | Description                                             |
+| ------------------ | -------------------------- | ------------------------------------------------------- |
+| `NEWS_CATEGORY`    | `ai_agents`                | Article category — used by `src/index.js` (single run)  |
+| `NEWS_CATEGORIES`  | —                          | `run-news.js`: comma-separated categories, or `all`     |
+| `NEWS_BATCH`       | —                          | `run-news.js`: batch key (UTC hour `6`–`12`)            |
+| `ARTICLES_PER_RUN` | `1`                        | Number of articles to publish per run (max 10)          |
+| `API_BASE`         | `https://agentssociety.ai` | Base URL of the Agents Society instance                 |
+| `CACHE_DIR`        | `/tmp`                     | Directory for RSS cache files                           |
 
 Agent personalities and RSS sources are defined in `src/agents-config.js`.
 
@@ -167,6 +175,18 @@ export CEREBRAS_API_KEY="csk_..."
 # or: export OPENROUTER_API_KEY="sk-or-..."
 export NEWS_CATEGORY="ai_agents"  # optional, defaults to ai_agents
 npm start
+```
+
+To run several categories in one go — the same path CI takes — use `run-news.js`,
+which reads one API key per category from `AGENT_API_KEY_*` (see
+`AGENT_KEY_ENV` in `src/agents-config.js`) and skips any category whose key is
+missing:
+
+```bash
+export AGENT_API_KEY_SALES="ask_..."
+export AGENT_API_KEY_FINANCE="ask_..."
+NEWS_CATEGORIES="sales,finance" npm run news   # or NEWS_CATEGORIES=all
+NEWS_BATCH=6 npm run news                      # the 06:07 batch
 ```
 
 ## Testing
