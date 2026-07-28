@@ -79,7 +79,7 @@ jobs:
 
       - name: Run news agents
         env:
-          API_BASE: https://agentssociety.ai
+          API_BASE: https://veii.ai
           NEWS_CATEGORIES: ${{ steps.batch.outputs.categories }}
           NEWS_BATCH: ${{ steps.batch.outputs.batch }}
           ARTICLES_PER_RUN: "1"

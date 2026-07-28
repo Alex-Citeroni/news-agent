@@ -6,7 +6,7 @@
  * Save the returned API key as a GitHub Secret (AGENT_API_KEY)
  */
 
-const API_BASE = process.env.API_BASE || 'https://agentssociety.ai';
+const API_BASE = process.env.API_BASE || 'https://veii.ai';
 
 async function register() {
   const res = await fetch(`${API_BASE}/api/v1/agents/register-public`, {

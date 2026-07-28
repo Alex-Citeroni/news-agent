@@ -13,7 +13,7 @@ import {
   makeJsonContentValidator,
 } from './llm.js';
 
-const API_BASE = process.env.API_BASE || 'https://agentssociety.ai';
+const API_BASE = process.env.API_BASE || 'https://veii.ai';
 const AGENT_API_KEY = process.env.AGENT_API_KEY;
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -38,6 +38,38 @@ if (!hasLLMProvider) {
 }
 
 const parser = new Parser({ timeout: 10000 });
+
+const FEED_TIMEOUT_MS = 10_000;
+
+/**
+ * Headers sent when fetching a feed. rss-parser's default User-Agent is a
+ * common blocklist entry, so we identify ourselves as a normal feed reader.
+ */
+const FEED_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; AgentsSocietyNewsBot/1.0; +https://veii.ai)',
+  Accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5',
+};
+
+/**
+ * Fetch and parse one feed. Does the HTTP call itself rather than using
+ * parser.parseURL() so we control the headers and can tell a dead feed apart
+ * from a malformed one.
+ *
+ * The shape check matters: when a publisher retires a feed it usually 301s to
+ * an HTML page instead of 404ing, and feeding that HTML to the strict XML
+ * parser surfaces as "Invalid character in entity name" — an error that reads
+ * like a broken feed rather than a moved one, and cost real debugging time.
+ */
+async function fetchFeed(url) {
+  const res = await fetchWithTimeout(url, { headers: FEED_HEADERS, redirect: 'follow' }, FEED_TIMEOUT_MS);
+  if (!res.ok) throw new Error(`Status code ${res.status}`);
+  const body = await res.text();
+  if (!/^\s*(<\?xml|<rss|<feed|<rdf:RDF)/i.test(body.slice(0, 300))) {
+    const dest = res.url !== url ? ` (redirected to ${res.url})` : '';
+    throw new Error(`not a feed — served ${res.headers.get('content-type') || 'unknown content'}${dest}`);
+  }
+  return parser.parseString(body);
+}
 
 /**
  * Fetch with timeout using AbortController
@@ -91,7 +123,7 @@ async function fetchNews() {
 
   const results = await Promise.allSettled(
     sources.map(async (source) => {
-      const feed = await parser.parseURL(source.url);
+      const feed = await fetchFeed(source.url);
       const recent = (feed.items || []).slice(0, 10);
       const items = [];
 
@@ -809,7 +841,34 @@ async function uploadToSupabase(imageBuffer, sourceUrl) {
     });
   if (error) throw new Error(`Supabase upload failed: ${error.message}`);
   const { data } = supabase.storage.from(SUPABASE_STORAGE_BUCKET).getPublicUrl(path);
+  brandedImagePath = path;
   return data.publicUrl;
+}
+
+/**
+ * Storage path of the branded image uploaded during this run, if any.
+ * A run publishes at most one article, so a single slot is enough.
+ */
+let brandedImagePath = null;
+
+/**
+ * Delete the branded image we uploaded for an article that never got
+ * published. Without this, every failed publish leaves a file in the bucket
+ * that nothing references — the 4 orphans from the veii.ai redirect outage
+ * were exactly this. Best-effort: a failed cleanup must not mask the real
+ * publish error.
+ */
+async function discardBrandedImage() {
+  if (!supabase || !brandedImagePath) return;
+  const path = brandedImagePath;
+  brandedImagePath = null;
+  try {
+    const { error } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).remove([path]);
+    if (error) throw new Error(error.message);
+    console.log(`  Discarded unused branded image: ${path}`);
+  } catch (err) {
+    console.warn(`  Could not discard unused branded image ${path}: ${err.message}`);
+  }
 }
 
 /**
@@ -1028,7 +1087,15 @@ async function main() {
 
   // Step 5: Publish single article with all translations
   console.log('Publishing article...');
-  const result = await publishArticle(article, translations);
+  let result;
+  try {
+    result = await publishArticle(article, translations);
+  } catch (err) {
+    // The branded image was uploaded before publishing; drop it so a failed
+    // run doesn't leave an unreferenced file in the bucket.
+    await discardBrandedImage();
+    throw err;
+  }
   console.log(`Published: "${result.title}" — slug: ${result.slug}`);
 
   console.log('Done!');

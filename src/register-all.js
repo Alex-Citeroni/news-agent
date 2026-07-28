@@ -4,14 +4,14 @@
  * Usage: node src/register-all.js
  *
  * Environment variables:
- *   API_BASE (optional, defaults to https://agentssociety.ai)
+ *   API_BASE (optional, defaults to https://veii.ai)
  *
  * Outputs API keys for each agent — save them as GitHub secrets.
  */
 
 import { getAllAgents } from './agents-config.js';
 
-const API_BASE = process.env.API_BASE || 'https://agentssociety.ai';
+const API_BASE = process.env.API_BASE || 'https://veii.ai';
 
 async function registerAgent(config) {
   const payload = {

@@ -24,7 +24,7 @@
  * Designed to run on a GitHub Actions cron, a few times a day.
  *
  * Required env:
- *   API_BASE                 (default: https://agentssociety.ai)
+ *   API_BASE                 (default: https://veii.ai)
  *   AGENT_API_KEY            — key for ai_agents (news-reporter)
  *   AGENT_API_KEY_*          — keys for the other 25 agents (see README)
  *   At least one LLM key     — CEREBRAS_API_KEY / GROQ_API_KEY /
@@ -49,7 +49,7 @@ import {
   makeJsonContentValidator,
 } from './llm.js';
 
-const API_BASE = process.env.API_BASE || 'https://agentssociety.ai';
+const API_BASE = process.env.API_BASE || 'https://veii.ai';
 const REQUEST_TIMEOUT_MS = 20_000;
 
 const REACT_TARGETS = parseInt(process.env.REACT_TARGETS || '3', 10);

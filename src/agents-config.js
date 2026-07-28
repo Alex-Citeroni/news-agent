@@ -28,7 +28,7 @@ const AGENTS = {
     rss_sources: [
       { name: 'TechCrunch - Apps', url: 'https://techcrunch.com/category/apps/feed/', keywords: ['ai', 'tool', 'app', 'platform', 'automation', 'workflow', 'productivity'] },
       { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml', keywords: ['tool', 'model', 'release', 'space', 'library', 'pipeline', 'demo'] },
-      { name: 'LangChain Blog', url: 'https://blog.langchain.com/rss/', keywords: ['tool', 'release', 'integration', 'feature', 'update', 'launch'] },
+      { name: 'LangChain Blog', url: 'https://www.langchain.com/blog/rss.xml', keywords: ['tool', 'release', 'integration', 'feature', 'update', 'launch'] },
       { name: 'The Verge - Tech', url: 'https://www.theverge.com/rss/tech/index.xml', keywords: ['ai tool', 'ai app', 'chatbot', 'ai feature', 'copilot', 'automation'] },
       { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['tool', 'platform', 'product', 'launch', 'app', 'saas'] },
     ],
@@ -43,7 +43,8 @@ const AGENTS = {
     rss_sources: [
       { name: 'HubSpot Sales Blog', url: 'https://blog.hubspot.com/sales/rss.xml', keywords: ['ai', 'automation', 'crm', 'pipeline', 'prospect', 'sales', 'tool', 'outreach'] },
       { name: 'Salesforce Blog', url: 'https://www.salesforce.com/blog/feed/', keywords: ['ai', 'einstein', 'sales', 'crm', 'automation', 'agent', 'revenue'] },
-      { name: 'GTMnow', url: 'https://gtmnow.com/feed/', keywords: ['ai', 'sales', 'revenue', 'pipeline', 'prospect', 'outbound', 'tool', 'automation'] },
+      // Replaced GTMnow (gtmnow.com/feed/ now answers 403 to every client).
+      { name: 'SaaStr', url: 'https://www.saastr.com/feed/', keywords: ['ai', 'sales', 'revenue', 'pipeline', 'prospect', 'outbound', 'tool', 'automation'] },
       { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['sales', 'crm', 'revenue', 'pipeline', 'prospect', 'deal', 'salesforce'] },
     ],
   },
@@ -57,7 +58,7 @@ const AGENTS = {
     rss_sources: [
       { name: 'HubSpot Marketing Blog', url: 'https://blog.hubspot.com/marketing/rss.xml', keywords: ['ai', 'automation', 'content', 'campaign', 'seo', 'email', 'personalization'] },
       { name: 'MarTech', url: 'https://martech.org/feed/', keywords: ['ai', 'marketing', 'martech', 'automation', 'personalization', 'analytics', 'content'] },
-      { name: 'Content Marketing Institute', url: 'https://www.contentmarketinginstitute.com/feed/', keywords: ['ai', 'content', 'strategy', 'automation', 'creative', 'tool'] },
+      { name: 'Content Marketing Institute', url: 'https://contentmarketinginstitute.com/rss.xml', keywords: ['ai', 'content', 'strategy', 'automation', 'creative', 'tool'] },
       { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['marketing', 'content', 'ad', 'campaign', 'brand', 'personalization', 'creative'] },
     ],
   },
@@ -71,7 +72,7 @@ const AGENTS = {
     rss_sources: [
       { name: 'Demand Gen Report', url: 'https://www.demandgenreport.com/feed/', keywords: ['ai', 'lead', 'demand', 'pipeline', 'prospect', 'intent', 'scoring', 'enrichment'] },
       { name: 'HubSpot Marketing Blog', url: 'https://blog.hubspot.com/marketing/rss.xml', keywords: ['lead', 'prospect', 'conversion', 'outreach', 'email', 'funnel', 'landing page'] },
-      { name: 'GTMnow', url: 'https://gtmnow.com/feed/', keywords: ['lead', 'prospect', 'outbound', 'pipeline', 'demand gen', 'conversion', 'enrichment'] },
+      { name: 'SaaStr', url: 'https://www.saastr.com/feed/', keywords: ['lead', 'prospect', 'outbound', 'pipeline', 'demand gen', 'conversion', 'enrichment'] },
       { name: 'TechCrunch - AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', keywords: ['lead', 'prospect', 'outreach', 'growth', 'b2b', 'enrichment'] },
     ],
   },
@@ -85,7 +86,7 @@ const AGENTS = {
     rss_sources: [
       { name: 'Supply Chain Dive', url: 'https://www.supplychaindive.com/feeds/news/', keywords: ['ai', 'automation', 'robot', 'optimization', 'forecast', 'logistics', 'warehouse'] },
       { name: 'McKinsey Insights', url: 'https://www.mckinsey.com/insights/rss', keywords: ['operations', 'supply chain', 'automation', 'efficiency', 'ai', 'digital', 'process'] },
-      { name: 'SupplyChainBrain', url: 'https://www.supplychainbrain.com/rss', keywords: ['ai', 'automation', 'optimization', 'logistics', 'warehouse', 'forecast'] },
+      { name: 'SupplyChainBrain', url: 'https://www.supplychainbrain.com/rss/articles', keywords: ['ai', 'automation', 'optimization', 'logistics', 'warehouse', 'forecast'] },
       { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['operations', 'supply chain', 'logistics', 'process', 'efficiency', 'optimization'] },
     ],
   },
@@ -112,7 +113,7 @@ const AGENTS = {
     category: 'revops',
     rss_sources: [
       { name: 'RevOps Co-op', url: 'https://revopscoop.substack.com/feed', keywords: ['revops', 'revenue', 'forecast', 'attribution', 'data', 'pipeline', 'ops'] },
-      { name: 'GTMnow', url: 'https://gtmnow.com/feed/', keywords: ['revops', 'revenue', 'gtm', 'forecast', 'attribution', 'pipeline', 'data'] },
+      { name: 'Tomasz Tunguz', url: 'https://tomtunguz.com/index.xml', keywords: ['revops', 'revenue', 'gtm', 'forecast', 'attribution', 'pipeline', 'data'] },
       { name: 'HubSpot Sales Blog', url: 'https://blog.hubspot.com/sales/rss.xml', keywords: ['revops', 'revenue', 'forecast', 'crm', 'analytics', 'pipeline', 'data'] },
       { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['revenue', 'forecast', 'analytics', 'attribution', 'data pipeline', 'crm'] },
     ],
@@ -168,7 +169,7 @@ const AGENTS = {
     system_prompt: 'You are a sharp, well-informed AI journalist who specializes in AI agents. You write with authority and a slightly provocative edge. You care about what agents can actually DO, not hype. You challenge vendor claims and highlight genuine breakthroughs. Your tone is confident, direct, and occasionally witty.',
     category: 'ai_agents',
     rss_sources: [
-      { name: 'LangChain Blog', url: 'https://blog.langchain.com/rss/', keywords: ['agent', 'autonomous', 'chain', 'tool', 'orchestration', 'agentic', 'workflow'] },
+      { name: 'LangChain Blog', url: 'https://www.langchain.com/blog/rss.xml', keywords: ['agent', 'autonomous', 'chain', 'tool', 'orchestration', 'agentic', 'workflow'] },
       { name: 'Made by Agents', url: 'https://www.madebyagents.com/rss/ai-agents', keywords: ['agent', 'autonomous', 'agentic', 'deploy', 'framework', 'multi-agent'] },
       { name: 'The Verge - AI', url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml', keywords: ['agent', 'autonomous', 'chatbot', 'assistant', 'copilot', 'agentic'] },
       { name: 'TechCrunch - AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', keywords: ['agent', 'autonomous', 'assistant', 'copilot', 'agentic', 'workflow'] },
@@ -185,7 +186,7 @@ const AGENTS = {
     rss_sources: [
       { name: 'Zapier Blog', url: 'https://zapier.com/blog/feeds/latest/', keywords: ['ai', 'workflow', 'automation', 'integration', 'agent', 'trigger', 'action'] },
       { name: 'n8n Blog', url: 'https://blog.n8n.io/rss/', keywords: ['ai', 'workflow', 'automation', 'orchestration', 'agent', 'integration', 'node'] },
-      { name: 'LangChain Blog', url: 'https://blog.langchain.com/rss/', keywords: ['workflow', 'chain', 'orchestration', 'pipeline', 'graph', 'langgraph', 'agent'] },
+      { name: 'LangChain Blog', url: 'https://www.langchain.com/blog/rss.xml', keywords: ['workflow', 'chain', 'orchestration', 'pipeline', 'graph', 'langgraph', 'agent'] },
       { name: 'TechCrunch - AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', keywords: ['workflow', 'orchestration', 'pipeline', 'automation', 'integration', 'no-code'] },
     ],
   },
@@ -225,7 +226,7 @@ const AGENTS = {
     system_prompt: 'You are a developer-focused AI journalist and open-source advocate who lives in GitHub repos and Discord channels. You understand agent frameworks, SDKs, and the technical challenges of building production agents. You celebrate community-driven innovation, give credit to individual contributors, and always include code examples or architecture insights. Your tone is technical, community-oriented, and builder-first.',
     category: 'agent_builders',
     rss_sources: [
-      { name: 'LangChain Blog', url: 'https://blog.langchain.com/rss/', keywords: ['agent', 'framework', 'sdk', 'build', 'langgraph', 'tool', 'chain', 'release'] },
+      { name: 'LangChain Blog', url: 'https://www.langchain.com/blog/rss.xml', keywords: ['agent', 'framework', 'sdk', 'build', 'langgraph', 'tool', 'chain', 'release'] },
       { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml', keywords: ['agent', 'framework', 'library', 'model', 'release', 'open source', 'tool'] },
       { name: 'OpenAI News', url: 'https://openai.com/news/rss.xml', keywords: ['api', 'sdk', 'developer', 'agent', 'tool', 'function', 'release'] },
       { name: 'Made by Agents', url: 'https://www.madebyagents.com/rss/ai-agents', keywords: ['builder', 'framework', 'sdk', 'developer', 'open source', 'agent'] },
@@ -339,7 +340,7 @@ const AGENTS = {
     category: 'agent_economy',
     rss_sources: [
       { name: 'Made by Agents', url: 'https://www.madebyagents.com/rss/ai-agents', keywords: ['economy', 'marketplace', 'agent', 'platform', 'commerce', 'interop', 'ecosystem'] },
-      { name: 'LangChain Blog', url: 'https://blog.langchain.com/rss/', keywords: ['marketplace', 'ecosystem', 'platform', 'agent', 'interop', 'multi-agent'] },
+      { name: 'LangChain Blog', url: 'https://www.langchain.com/blog/rss.xml', keywords: ['marketplace', 'ecosystem', 'platform', 'agent', 'interop', 'multi-agent'] },
       { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', keywords: ['ai agent', 'agent economy', 'marketplace', 'autonomous', 'commerce'] },
       { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['agent economy', 'marketplace', 'platform', 'ecosystem', 'interop'] },
     ],

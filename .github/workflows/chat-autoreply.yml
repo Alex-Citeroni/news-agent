@@ -33,7 +33,7 @@ jobs:
 
       - name: Run chat autoreply for all agents
         env:
-          API_BASE: https://agentssociety.ai
+          API_BASE: https://veii.ai
           AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
           AGENT_API_KEY_TECH_TRENDS: ${{ secrets.AGENT_API_KEY_TECH_TRENDS }}
           AGENT_API_KEY_AI_TOOLS: ${{ secrets.AGENT_API_KEY_AI_TOOLS }}

@@ -31,12 +31,17 @@ const LLM_INITIAL_BACKOFF_MS = 3000;   // base for exponential backoff on retrya
 export function buildProviders() {
   const providers = [];
 
-  // Primary: Cerebras Qwen 235B (1M TPD free, 3000 tok/s, best quality)
+  // Primary: Cerebras GPT-OSS 120B (1M TPD free, ~3000 tok/s, best quality).
+  // NOTE: model IDs on Cerebras' free endpoints get retired without notice —
+  // the previous `qwen-3-235b-a22b-instruct-2507` started 404ing and every run
+  // silently burned the primary slot before falling through to Groq. If you see
+  // `cerebras: non-retryable error (404 ...)` in the logs, check
+  // https://inference-docs.cerebras.ai/models/overview for the current IDs.
   if (CEREBRAS_API_KEY) {
     providers.push({
       name: 'cerebras',
       client: new OpenAI({ apiKey: CEREBRAS_API_KEY, baseURL: 'https://api.cerebras.ai/v1', timeout: LLM_REQUEST_TIMEOUT_MS, maxRetries: 0 }),
-      model: 'qwen-3-235b-a22b-instruct-2507',
+      model: 'gpt-oss-120b',
     });
   }
 
@@ -89,12 +94,15 @@ export function buildProviders() {
     });
   }
 
-  // Fallback 4: Cerebras Llama 8B (fast but lower quality, separate quota from Qwen)
+  // Fallback 4: Cerebras Gemma 4 31B (lower quality, separate quota from the
+  // primary Cerebras model). Not in JSON_MODE_PROVIDERS — Cerebras only
+  // documents structured outputs for gpt-oss-120b, so we let extractJSON()
+  // recover the object from a plain completion instead of risking a 400.
   if (CEREBRAS_API_KEY) {
     providers.push({
-      name: 'cerebras-llama',
+      name: 'cerebras-gemma',
       client: new OpenAI({ apiKey: CEREBRAS_API_KEY, baseURL: 'https://api.cerebras.ai/v1', timeout: LLM_REQUEST_TIMEOUT_MS, maxRetries: 0 }),
-      model: 'llama3.1-8b',
+      model: 'gemma-4-31b',
     });
   }
 
@@ -154,7 +162,6 @@ export function extractJSON(text) {
 /** Providers that support response_format: json_object */
 const JSON_MODE_PROVIDERS = new Set([
   'cerebras',
-  'cerebras-llama',
   'groq',
   'gemini',
   'gemini-flash-lite',

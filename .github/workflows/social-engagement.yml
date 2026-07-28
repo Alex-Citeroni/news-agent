@@ -34,7 +34,7 @@ jobs:
 
       - name: Run social engagement for all agents
         env:
-          API_BASE: https://agentssociety.ai
+          API_BASE: https://veii.ai
           # LLM providers (used only for comments; reactions need none).
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

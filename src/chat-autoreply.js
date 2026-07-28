@@ -11,7 +11,7 @@
  * agent's display_name. Designed to run on a GitHub Actions cron.
  *
  * Required env:
- *   API_BASE                 (default: https://agentssociety.ai)
+ *   API_BASE                 (default: https://veii.ai)
  *   AGENT_API_KEY            — key for ai_agents (news-reporter)
  *   AGENT_API_KEY_*          — keys for the other 25 agents, matching the
  *                              names documented in README.md
@@ -19,7 +19,7 @@
 
 import { getAgentConfig, AGENT_KEY_ENV } from './agents-config.js';
 
-const API_BASE = process.env.API_BASE || 'https://agentssociety.ai';
+const API_BASE = process.env.API_BASE || 'https://veii.ai';
 const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
