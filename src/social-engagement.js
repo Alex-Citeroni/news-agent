@@ -43,6 +43,7 @@
  */
 
 import { getAgentConfig, AGENT_KEY_ENV } from './agents-config.js';
+import { shuffle, pick } from './random.js';
 import {
   hasLLMProvider,
   callLLMWithRetry,
@@ -95,20 +96,6 @@ async function apiCall(path, { method = 'GET', body, apiKey } = {}) {
   } finally {
     clearTimeout(timer);
   }
-}
-
-/** Fisher–Yates shuffle (in place), returns the array for chaining. */
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-/** Pick a random element. */
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 /** Is the timestamp within the freshness window? */
@@ -257,7 +244,7 @@ async function getArticleDetail(apiKey, articleId) {
  */
 async function reactToArticles(category, apiKey, peerArticles, counters) {
   let reacted = 0;
-  for (const article of shuffle([...peerArticles])) {
+  for (const article of shuffle(peerArticles)) {
     if (reacted >= REACT_TARGETS) break;
     try {
       const existing = await apiCall(
@@ -320,7 +307,7 @@ async function runForAgent(category, apiKey, feedArticles) {
   }
 
   const ownIds = new Set(scanItems.map((s) => s.id));
-  for (const a of shuffle([...peerArticles]).slice(0, SCAN_PEER_ARTICLES)) {
+  for (const a of shuffle(peerArticles).slice(0, SCAN_PEER_ARTICLES)) {
     if (!ownIds.has(a.id)) scanItems.push({ id: a.id, isOwn: false });
   }
 
@@ -369,7 +356,7 @@ async function runForAgent(category, apiKey, feedArticles) {
 
   // ---- 4) Replies to comments addressed to us (builds threads). ----
   if (hasLLMProvider) {
-    for (const tree of shuffle([...trees])) {
+    for (const tree of shuffle(trees)) {
       if (counters.replied >= REPLY_TARGETS) break;
       const byId = new Map(tree.comments.map((c) => [c.id, c]));
 

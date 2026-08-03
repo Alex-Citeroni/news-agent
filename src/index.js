@@ -1,10 +1,12 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import Parser from 'rss-parser';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import { getSourcesForCategory } from './rss-sources.js';
 import { getAgentConfig } from './agents-config.js';
-import { isDuplicate } from './dedup.js';
+import { shuffle, pick } from './random.js';
+import { isDuplicate, photoKeyFromUrl, photoKeySuffix, collectUsedPhotoKeys } from './dedup.js';
 import {
   LLM_PROVIDERS,
   hasLLMProvider,
@@ -28,13 +30,19 @@ const ARTICLES_PER_RUN = parseInt(process.env.ARTICLES_PER_RUN || '1', 10);
 const FETCH_TIMEOUT_MS = 15000;
 const PUBLISH_TIMEOUT_MS = 60_000;
 
-if (!AGENT_API_KEY) {
-  console.error('Missing required env var: AGENT_API_KEY');
-  process.exit(1);
-}
-if (!hasLLMProvider) {
-  console.error('No LLM provider configured. Set at least one of: CEREBRAS_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, OPENROUTER_API_KEY');
-  process.exit(1);
+/**
+ * Env preconditions. Checked when run as a script, not at import time, so the
+ * module stays importable from tests.
+ */
+function assertRequiredEnv() {
+  if (!AGENT_API_KEY) {
+    console.error('Missing required env var: AGENT_API_KEY');
+    process.exit(1);
+  }
+  if (!hasLLMProvider) {
+    console.error('No LLM provider configured. Set at least one of: CEREBRAS_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, OPENROUTER_API_KEY');
+    process.exit(1);
+  }
 }
 
 const parser = new Parser({ timeout: 10000 });
@@ -153,15 +161,40 @@ async function fetchNews() {
     }
   }
 
-  // Sort by date (newest first), then add slight randomness within same-day items
-  const sorted = allItems.sort((a, b) => {
-    const dateA = a.date ? new Date(a.date).getTime() : 0;
-    const dateB = b.date ? new Date(b.date).getTime() : 0;
-    // If dates are within 24h of each other, randomize order for variety
-    if (Math.abs(dateA - dateB) < 86400000) return Math.random() - 0.5;
-    return dateB - dateA;
-  });
-  return sorted.slice(0, ARTICLES_PER_RUN * 3);
+  return orderNewsItems(allItems).slice(0, ARTICLES_PER_RUN * 3);
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Order news items newest-day-first, shuffled within each day.
+ *
+ * The previous version returned `Math.random() - 0.5` from the comparator for
+ * items less than 24h apart. That comparator is not transitive, so the result
+ * was neither a date ordering nor a uniform shuffle — and it carried the same
+ * positional bias as `sort(() => Math.random() - 0.5)`, meaning the same feeds
+ * kept winning the top slots. Only the first `ARTICLES_PER_RUN * 3` items ever
+ * reach the LLM, so that bias narrowed which stories could be picked at all.
+ *
+ * Bucketing by UTC day (rather than a 24h window) keeps the grouping a proper
+ * equivalence relation, so the ordering is well-defined.
+ */
+export function orderNewsItems(items) {
+  const timestamp = (item) => {
+    const t = item.date ? new Date(item.date).getTime() : 0;
+    return Number.isFinite(t) ? t : 0; // undated or unparsable items sort last
+  };
+
+  const byDay = new Map();
+  for (const item of items) {
+    const day = Math.floor(timestamp(item) / DAY_MS);
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push(item);
+  }
+
+  return [...byDay.entries()]
+    .sort(([dayA], [dayB]) => dayB - dayA)
+    .flatMap(([, sameDay]) => shuffle(sameDay));
 }
 
 /**
@@ -361,17 +394,25 @@ async function getRecentArticles() {
 /**
  * Fetch recent articles from ALL agents (public endpoint) for cross-agent dedup.
  * Fetches multiple pages to cover ~2-3 days of articles across all agents.
+ *
+ * The endpoint is edge-cached (`cache-control: public, max-age=30`) and the
+ * categories of a batch run seconds apart, so a plain request here regularly
+ * returned a snapshot taken BEFORE the previous category published — exactly
+ * the sibling most likely to collide on story and cover image. A unique query
+ * param forces a cache MISS; a `Cache-Control: no-cache` request header does
+ * not (verified against the CDN).
  */
 async function getGlobalRecentArticles() {
   try {
     const articles = [];
     let cursor = null;
     const MAX_PAGES = 2;
+    const bust = `_=${Date.now()}`;
 
     for (let page = 0; page < MAX_PAGES; page++) {
       const url = cursor
-        ? `${API_BASE}/api/news?limit=30&sort=latest&cursor=${cursor}`
-        : `${API_BASE}/api/news?limit=30&sort=latest`;
+        ? `${API_BASE}/api/news?limit=30&sort=latest&cursor=${encodeURIComponent(cursor)}&${bust}`
+        : `${API_BASE}/api/news?limit=30&sort=latest&${bust}`;
       const res = await fetchWithTimeout(url);
       const data = await res.json();
       articles.push(...(data.articles || []));
@@ -485,16 +526,22 @@ async function searchUnsplash(query) {
       return [];
     }
     const data = await res.json();
-    const results = data.results || [];
     // Shuffle for variety across agents/runs
-    const shuffled = [...results].sort(() => Math.random() - 0.5);
-    return shuffled
-      .map((photo) => ({
-        url: photo.urls?.regular || photo.urls?.small,
-        source: 'Unsplash',
-        query,
-        author: photo.user?.name || 'unknown',
-      }))
+    return shuffle(data.results || [])
+      .map((photo) => {
+        const url = photo.urls?.regular || photo.urls?.small;
+        return {
+          url,
+          key: photoKeyFromUrl(url),
+          source: 'Unsplash',
+          query,
+          author: photo.user?.name || 'unknown',
+          authorUrl: photo.user?.links?.html || null,
+          // Unsplash requires a hit on this endpoint when a photo is actually
+          // used — see triggerUnsplashDownload().
+          downloadLocation: photo.links?.download_location || null,
+        };
+      })
       .filter((c) => c.url);
   } catch (err) {
     console.warn(`  Unsplash error for "${query}": ${err.message}`);
@@ -518,15 +565,19 @@ async function searchPixabay(query) {
       return [];
     }
     const data = await res.json();
-    const hits = data.hits || [];
-    const shuffled = [...hits].sort(() => Math.random() - 0.5);
-    return shuffled
-      .map((hit) => ({
-        url: hit.largeImageURL || hit.webformatURL,
-        source: 'Pixabay',
-        query,
-        author: hit.user || 'unknown',
-      }))
+    return shuffle(data.hits || [])
+      .map((hit) => {
+        const url = hit.largeImageURL || hit.webformatURL;
+        return {
+          url,
+          key: photoKeyFromUrl(url),
+          source: 'Pixabay',
+          query,
+          author: hit.user || 'unknown',
+          authorUrl: hit.pageURL || null,
+          downloadLocation: null,
+        };
+      })
       .filter((c) => c.url);
   } catch (err) {
     console.warn(`  Pixabay error for "${query}": ${err.message}`);
@@ -537,7 +588,7 @@ async function searchPixabay(query) {
 /**
  * Escape a string for safe inclusion in an SVG text node.
  */
-function escapeXml(s) {
+export function escapeXml(s) {
   return String(s)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -549,7 +600,7 @@ function escapeXml(s) {
 /**
  * Greedy word-wrap into up to `maxLines` lines of roughly `maxCharsPerLine` chars.
  */
-function wrapHeadline(text, maxCharsPerLine, maxLines) {
+export function wrapHeadline(text, maxCharsPerLine, maxLines) {
   const words = text.split(/\s+/).filter(Boolean);
   const lines = [];
   let current = '';
@@ -615,11 +666,6 @@ const CATEGORY_TO_PALETTE = {
 function getPaletteForCategory(category) {
   const family = CATEGORY_TO_PALETTE[category] || 'tech';
   return { ...PALETTE_FAMILIES[family], family };
-}
-
-/** Pick a random element from an array. */
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 /** Derive a short eyebrow label from tags or fall back to the category name. */
@@ -695,7 +741,7 @@ async function analyzeImageLayout(imageBuffer) {
  * Minor randomisation on accent width, left padding, and accent gap keeps
  * consecutive posts from looking identical.
  */
-function buildOverlaySvg({ headline, eyebrow, layout, accent, width, height }) {
+export function buildOverlaySvg({ headline, eyebrow, layout, accent, width, height }) {
   const wrap = LAYOUT_WRAP[layout] || LAYOUT_WRAP.bottom;
   const lines = wrapHeadline(headline.toUpperCase(), wrap.maxChars, wrap.maxLines);
 
@@ -825,12 +871,17 @@ async function overlayHeadlineOnImage(imageUrl, headline, eyebrow) {
  * Upload a JPEG buffer to Supabase Storage. The original stock-photo URL is
  * attached as object metadata so a future cleanup job can rollback the
  * article's featured_image_url before deleting the branded file.
+ *
+ * The source photo key is also embedded in the filename: object metadata isn't
+ * visible from the published URL, and other agents need to see which stock
+ * photos are already taken to avoid reusing them.
+ *
  * Assumes the bucket is configured as public.
  */
-async function uploadToSupabase(imageBuffer, sourceUrl) {
+async function uploadToSupabase(imageBuffer, sourceUrl, photoKey) {
   if (!supabase) throw new Error('Supabase not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)');
   const random = Math.random().toString(36).slice(2, 10);
-  const path = `${CATEGORY}/${Date.now()}-${random}.jpg`;
+  const path = `${CATEGORY}/${Date.now()}-${random}${photoKeySuffix(photoKey)}.jpg`;
   const { error } = await supabase.storage
     .from(SUPABASE_STORAGE_BUCKET)
     .upload(path, imageBuffer, {
@@ -876,7 +927,7 @@ async function discardBrandedImage() {
  * Returns the hosted URL, or null on any failure so the caller can fall back
  * to the original image.
  */
-async function brandImage(sourceUrl, headline, tags) {
+async function brandImage(sourceUrl, headline, tags, photoKey) {
   if (!supabase) {
     console.log('  Skipping image branding (Supabase not configured)');
     return null;
@@ -888,7 +939,7 @@ async function brandImage(sourceUrl, headline, tags) {
   try {
     const eyebrow = deriveEyebrow(tags);
     const buffer = await overlayHeadlineOnImage(sourceUrl, headline, eyebrow);
-    const url = await uploadToSupabase(buffer, sourceUrl);
+    const url = await uploadToSupabase(buffer, sourceUrl, photoKey);
     console.log(`  Branded image uploaded: ${url}`);
     return url;
   } catch (err) {
@@ -898,44 +949,155 @@ async function brandImage(sourceUrl, headline, tags) {
 }
 
 /**
+ * Interleave two provider result lists so we don't exhaust one before trying
+ * the other.
+ */
+export function interleaveCandidates(a, b) {
+  const out = [];
+  const max = Math.max(a.length, b.length);
+  for (let i = 0; i < max; i++) {
+    if (a[i]) out.push(a[i]);
+    if (b[i]) out.push(b[i]);
+  }
+  return out;
+}
+
+/**
+ * Max reachability checks per article. Each is an 8s-timeout HEAD request run
+ * sequentially, so without a cap a run where the providers return a wall of
+ * dead URLs could spend minutes here.
+ */
+const MAX_IMAGE_CHECKS = 24;
+
+/**
+ * Walk candidates and return the first reachable one not already in use.
+ *
+ * Skips photos whose key is in `usedPhotoKeys`: agents covering adjacent
+ * topics generate near-identical search queries (the prompt even asks for a
+ * broad third query), so without this two agents regularly picked the same
+ * stock photo out of the same result set. A photo skipped only for being taken
+ * is returned as `taken` so the caller can fall back to it — a reused image
+ * still beats no image at all.
+ *
+ * `isReachable` and `budget` are injected to keep this unit testable; `budget`
+ * is mutated so the check cap spans every query of one article.
+ */
+export async function selectCandidate(candidates, usedPhotoKeys, isReachable, budget) {
+  let taken = null;
+
+  for (const candidate of candidates) {
+    if (budget.checks <= 0) {
+      console.warn(`  Image check budget exhausted (${MAX_IMAGE_CHECKS} URLs verified)`);
+      break;
+    }
+    budget.checks--;
+
+    if (!(await isReachable(candidate.url))) {
+      console.warn(`  Skipping unreachable image from ${candidate.source}: ${candidate.url}`);
+      continue;
+    }
+    if (candidate.key && usedPhotoKeys.has(candidate.key)) {
+      console.log(`  Skipping image already used by a recent article: ${candidate.key}`);
+      taken = taken || candidate;
+      continue;
+    }
+    return { chosen: candidate, taken };
+  }
+
+  return { chosen: null, taken };
+}
+
+/**
+ * Tell Unsplash a photo was used. Required by their API guidelines whenever a
+ * photo is downloaded or displayed — skipping it is grounds for revoking the
+ * application's access. Best-effort: a failure here must not cost us the image.
+ */
+async function triggerUnsplashDownload(candidate) {
+  if (candidate.source !== 'Unsplash' || !candidate.downloadLocation || !UNSPLASH_ACCESS_KEY) return;
+  try {
+    await fetchWithTimeout(candidate.downloadLocation, {
+      headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` },
+    }, 8000);
+  } catch (err) {
+    console.warn(`  Unsplash download trigger failed: ${err.message}`);
+  }
+}
+
+/**
  * Search for a relevant featured image. For each query, gather candidates from
- * both providers and return the first one whose URL actually resolves to an
- * image. This prevents publishing articles with broken image URLs.
+ * both providers and take the first reachable one that no recent article is
+ * already using. Verifying reachability prevents publishing broken image URLs.
+ *
  * If Supabase is configured, composes the generated headline + eyebrow on top
  * of the chosen image and returns the hosted branded URL.
+ *
+ * Returns `{ url, credit }` — credit carries the photographer attribution the
+ * providers ask for — or null when nothing usable was found.
  */
-async function findFeaturedImage(title, body, tags) {
+async function findFeaturedImage(title, body, tags, usedPhotoKeys = new Set()) {
   const { queries, headline } = await generateImageKeywords(title, body);
   console.log(`  Image search queries: ${JSON.stringify(queries)}`);
   if (headline) console.log(`  Image headline: "${headline}"`);
+
+  const use = async (candidate) => {
+    console.log(`  Image found: ${candidate.source} "${candidate.query}" (by ${candidate.author})`);
+    await triggerUnsplashDownload(candidate);
+    const branded = await brandImage(candidate.url, headline, tags, candidate.key);
+    return {
+      url: branded || candidate.url,
+      credit: { author: candidate.author, authorUrl: candidate.authorUrl, source: candidate.source },
+    };
+  };
+
+  const budget = { checks: MAX_IMAGE_CHECKS };
+  let taken = null; // reachable, but already used by a recent article
 
   for (const query of queries) {
     const [unsplashCandidates, pixabayCandidates] = await Promise.all([
       searchUnsplash(query),
       searchPixabay(query),
     ]);
-    // Interleave providers so we don't exhaust one before trying the other
-    const candidates = [];
-    const max = Math.max(unsplashCandidates.length, pixabayCandidates.length);
-    for (let i = 0; i < max; i++) {
-      if (unsplashCandidates[i]) candidates.push(unsplashCandidates[i]);
-      if (pixabayCandidates[i]) candidates.push(pixabayCandidates[i]);
-    }
+    const candidates = interleaveCandidates(unsplashCandidates, pixabayCandidates);
 
-    for (const candidate of candidates) {
-      const ok = await verifyImageUrl(candidate.url);
-      if (!ok) {
-        console.warn(`  Skipping unreachable image from ${candidate.source}: ${candidate.url}`);
-        continue;
-      }
-      console.log(`  Image found: ${candidate.source} "${candidate.query}" (by ${candidate.author})`);
-      const branded = await brandImage(candidate.url, headline, tags);
-      return branded || candidate.url;
-    }
+    const { chosen, taken: takenHere } = await selectCandidate(
+      candidates, usedPhotoKeys, verifyImageUrl, budget
+    );
+    if (chosen) return use(chosen);
+    taken = taken || takenHere;
+    if (budget.checks <= 0) break;
+  }
+
+  if (taken) {
+    console.warn('  Every candidate was already in use — falling back to a reused image');
+    return use(taken);
   }
 
   console.warn('  No featured image found after all attempts');
   return null;
+}
+
+/** Credit-line label per published language. */
+const PHOTO_CREDIT_LABEL = { en: 'Photo', es: 'Foto', zh: '图片' };
+
+/**
+ * Render the photographer credit line. Unsplash's API guidelines require
+ * crediting the photographer and the source whenever a photo is displayed;
+ * Pixabay doesn't require it but asks for it. The article body is plain text,
+ * so the profile link goes in parentheses rather than as markup.
+ */
+export function formatPhotoCredit(credit, lang = 'en') {
+  if (!credit?.author || credit.author === 'unknown') return null;
+  const label = PHOTO_CREDIT_LABEL[lang] || PHOTO_CREDIT_LABEL.en;
+  const separator = lang === 'zh' ? '：' : ': ';
+  const link = credit.authorUrl ? ` (${credit.authorUrl})` : '';
+  return `${label}${separator}${credit.author} / ${credit.source}${link}`;
+}
+
+/** Append the credit line to an article body, if there is one to add. */
+export function appendPhotoCredit(body, credit, lang = 'en') {
+  const line = formatPhotoCredit(credit, lang);
+  if (!line || typeof body !== 'string' || !body.trim()) return body;
+  return `${body.trimEnd()}\n\n${line}`;
 }
 
 /**
@@ -1062,14 +1224,21 @@ async function main() {
     { code: 'zh', name: 'Simplified Chinese' },
   ];
 
+  // Stock photos already on recent articles (own + all agents), so two agents
+  // covering adjacent topics don't end up with the same cover image.
+  const usedPhotoKeys = collectUsedPhotoKeys(allArticles);
+  console.log(`  Avoiding ${usedPhotoKeys.size} image(s) already used recently`);
+
   const [imageResult, ...translationResults] = await Promise.allSettled([
-    findFeaturedImage(article.title, article.body, article.tags),
+    findFeaturedImage(article.title, article.body, article.tags, usedPhotoKeys),
     ...langs.map(({ name }) => translateArticle(article, name)),
   ]);
 
   // Apply image
+  let imageCredit = null;
   if (imageResult.status === 'fulfilled' && imageResult.value) {
-    article.featured_image_url = imageResult.value;
+    article.featured_image_url = imageResult.value.url;
+    imageCredit = imageResult.value.credit;
   } else if (imageResult.status === 'rejected') {
     console.warn(`  Image search error: ${imageResult.reason?.message}`);
   }
@@ -1083,6 +1252,16 @@ async function main() {
     } else {
       console.error(`  Translation error (${langs[i].code}): ${translationResults[i].reason?.message}`);
     }
+  }
+
+  // Photographer credit, appended after translation so the line itself is not
+  // run through the model (and so every language gets the same names/links).
+  if (imageCredit) {
+    article.body = appendPhotoCredit(article.body, imageCredit, 'en');
+    for (const [code, translation] of Object.entries(translations)) {
+      translation.body = appendPhotoCredit(translation.body, imageCredit, code);
+    }
+    console.log(`  Photo credit: ${formatPhotoCredit(imageCredit)}`);
   }
 
   // Step 5: Publish single article with all translations
@@ -1101,14 +1280,19 @@ async function main() {
   console.log('Done!');
 }
 
-main()
-  // Exit explicitly on success/no-op so the process ends the moment main()
-  // resolves. Without this, lingering open handles (Supabase auth-refresh
-  // timer, keep-alive sockets to LLM/API hosts) keep the event loop alive and
-  // the job hangs until GitHub's timeout-minutes kill it ("The operation was
-  // canceled" — 15 min wasted on every "already covered" no-op run).
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error('Fatal error:', err);
-    process.exit(1);
-  });
+// Only run when executed directly, so the pure helpers above stay importable
+// from tests (same guard run-news.js uses).
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  assertRequiredEnv();
+  main()
+    // Exit explicitly on success/no-op so the process ends the moment main()
+    // resolves. Without this, lingering open handles (Supabase auth-refresh
+    // timer, keep-alive sockets to LLM/API hosts) keep the event loop alive and
+    // the job hangs until GitHub's timeout-minutes kill it ("The operation was
+    // canceled" — 15 min wasted on every "already covered" no-op run).
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Fatal error:', err);
+      process.exit(1);
+    });
+}
