@@ -12,7 +12,6 @@ import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-const CEREBRAS_API_KEY = process.env.CEREBRAS_API_KEY || '';
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY || '';
@@ -31,56 +30,60 @@ const LLM_INITIAL_BACKOFF_MS = 3000;   // base for exponential backoff on retrya
 export function buildProviders() {
   const providers = [];
 
-  // Primary: Cerebras GPT-OSS 120B (1M TPD free, ~3000 tok/s, best quality).
-  // NOTE: model IDs on Cerebras' free endpoints get retired without notice —
-  // the previous `qwen-3-235b-a22b-instruct-2507` started 404ing and every run
-  // silently burned the primary slot before falling through to Groq. If you see
-  // `cerebras: non-retryable error (404 ...)` in the logs, check
-  // https://inference-docs.cerebras.ai/models/overview for the current IDs.
-  if (CEREBRAS_API_KEY) {
-    providers.push({
-      name: 'cerebras',
-      client: new OpenAI({ apiKey: CEREBRAS_API_KEY, baseURL: 'https://api.cerebras.ai/v1', timeout: LLM_REQUEST_TIMEOUT_MS, maxRetries: 0 }),
-      model: 'gpt-oss-120b',
-    });
+  // Gemini entries share one endpoint but each model has its own free-tier
+  // quota bucket, so stacking several genuinely multiplies daily capacity
+  // instead of just re-hitting the same limit.
+  const gemini = (name, model) => ({
+    name,
+    client: new OpenAI({
+      apiKey: GEMINI_API_KEY,
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+      timeout: LLM_REQUEST_TIMEOUT_MS,
+      maxRetries: 0,
+    }),
+    model,
+  });
+
+  // Primary tier: Google Gemini Flash (free tier, reliable, native JSON mode).
+  // `gemini-2.0-flash` / `gemini-2.0-flash-lite` were shut down and 404'd the
+  // whole slot, so the first entry uses the `-latest` alias, which Google
+  // hot-swaps to the current Flash release (2-week notice on breaking changes)
+  // and therefore never 404s. The pinned entries below it are stable IDs that
+  // each draw on a separate quota bucket.
+  // Current IDs: https://ai.google.dev/gemini-api/docs/models
+  if (GEMINI_API_KEY) {
+    providers.push(gemini('gemini', 'gemini-flash-latest'));
+    providers.push(gemini('gemini-3.5-flash', 'gemini-3.5-flash'));
+    providers.push(gemini('gemini-2.5-flash', 'gemini-2.5-flash'));
   }
 
-  // Fallback 1: Groq Llama 70B (100K TPD free, fast, good quality)
+  // Fallback 1: Groq (very fast, but the free tier is capped at 8K tokens/min
+  // and 200K/day per model — too tight to carry the primary slot for 26 agents).
+  // NOTE: `llama-3.3-70b-versatile` was dropped: Groq still lists it as a
+  // production model but it is no longer on the free plan, which is why it
+  // returned `404 ... does not exist or you do not have access to it`.
+  // qwen3.8-27b is a preview model (may be discontinued) but has its own quota.
+  // Current IDs: https://console.groq.com/docs/models
   if (GROQ_API_KEY) {
     providers.push({
       name: 'groq',
       client: new Groq({ apiKey: GROQ_API_KEY, timeout: LLM_REQUEST_TIMEOUT_MS, maxRetries: 0 }),
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
+    });
+    providers.push({
+      name: 'groq-qwen',
+      client: new Groq({ apiKey: GROQ_API_KEY, timeout: LLM_REQUEST_TIMEOUT_MS, maxRetries: 0 }),
+      model: 'qwen/qwen3.8-27b',
     });
   }
 
-  // Fallback 2: Google Gemini 2.0 Flash (1500 RPD free, very reliable, native JSON mode)
-  // Uses Google's OpenAI-compatible endpoint.
+  // Fallback 2: lower-tier Gemini — smaller model, yet another quota bucket.
   if (GEMINI_API_KEY) {
-    providers.push({
-      name: 'gemini',
-      client: new OpenAI({
-        apiKey: GEMINI_API_KEY,
-        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-        timeout: LLM_REQUEST_TIMEOUT_MS,
-        maxRetries: 0,
-      }),
-      model: 'gemini-2.0-flash',
-    });
-    // Lower-tier Gemini fallback within the same provider (different quota bucket)
-    providers.push({
-      name: 'gemini-flash-lite',
-      client: new OpenAI({
-        apiKey: GEMINI_API_KEY,
-        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-        timeout: LLM_REQUEST_TIMEOUT_MS,
-        maxRetries: 0,
-      }),
-      model: 'gemini-2.0-flash-lite',
-    });
+    providers.push(gemini('gemini-flash-lite', 'gemini-2.5-flash-lite'));
   }
 
-  // Fallback 3: Mistral free tier (small/medium quality, separate quota)
+  // Fallback 3: Mistral free tier (separate quota, but rate-limits hard — it
+  // 429'd on every attempt in the 2026-09-06 run, so it sits low in the chain)
   if (MISTRAL_API_KEY) {
     providers.push({
       name: 'mistral',
@@ -94,37 +97,28 @@ export function buildProviders() {
     });
   }
 
-  // Fallback 4: Cerebras Gemma 4 31B (lower quality, separate quota from the
-  // primary Cerebras model). Not in JSON_MODE_PROVIDERS — Cerebras only
-  // documents structured outputs for gpt-oss-120b, so we let extractJSON()
-  // recover the object from a plain completion instead of risking a 400.
-  if (CEREBRAS_API_KEY) {
-    providers.push({
-      name: 'cerebras-gemma',
-      client: new OpenAI({ apiKey: CEREBRAS_API_KEY, baseURL: 'https://api.cerebras.ai/v1', timeout: LLM_REQUEST_TIMEOUT_MS, maxRetries: 0 }),
-      model: 'gemma-4-31b',
-    });
-  }
-
   // Last resort: OpenRouter free models (notoriously unstable: empty/truncated responses).
   // Placed last because they often return non-JSON or empty content.
   // Every model below uses the `:free` suffix — guaranteed zero cost per token.
+  // OpenRouter retires `:free` variants without notice (the 404 body tells you
+  // to switch to the paid slug — do NOT, that would start billing). Verify with
+  // `curl -s https://openrouter.ai/api/v1/models | jq -r '.data[].id | select(endswith(":free"))'`.
   if (OPENROUTER_API_KEY) {
     const orClient = new OpenAI({ apiKey: OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1', timeout: LLM_REQUEST_TIMEOUT_MS, maxRetries: 0 });
     providers.push({
-      name: 'openrouter-deepseek',
+      name: 'openrouter-nemotron',
       client: orClient,
-      model: 'deepseek/deepseek-chat-v3-0324:free',
+      model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
     });
     providers.push({
-      name: 'openrouter-llama',
+      name: 'openrouter-minimax',
       client: orClient,
-      model: 'meta-llama/llama-3.3-70b-instruct:free',
+      model: 'minimax/minimax-m3:free',
     });
     providers.push({
       name: 'openrouter-gemma',
       client: orClient,
-      model: 'google/gemma-3-27b-it:free',
+      model: 'google/gemma-4-31b-it:free',
     });
   }
 
@@ -161,10 +155,12 @@ export function extractJSON(text) {
 
 /** Providers that support response_format: json_object */
 const JSON_MODE_PROVIDERS = new Set([
-  'cerebras',
-  'groq',
   'gemini',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
   'gemini-flash-lite',
+  'groq',
+  'groq-qwen',
   'mistral',
 ]);
 

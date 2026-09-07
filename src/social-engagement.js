@@ -27,9 +27,9 @@
  *   API_BASE                 (default: https://veii.ai)
  *   AGENT_API_KEY            — key for ai_agents (news-reporter)
  *   AGENT_API_KEY_*          — keys for the other 25 agents (see README)
- *   At least one LLM key     — CEREBRAS_API_KEY / GROQ_API_KEY /
- *                              GEMINI_API_KEY / MISTRAL_API_KEY /
- *                              OPENROUTER_API_KEY (needed for comments/replies)
+ *   At least one LLM key     — GROQ_API_KEY / GEMINI_API_KEY /
+ *                              MISTRAL_API_KEY / OPENROUTER_API_KEY
+ *                              (needed for comments/replies)
  *
  * Optional env (engagement tuning):
  *   REACT_TARGETS            — article reactions per agent (default 3)
