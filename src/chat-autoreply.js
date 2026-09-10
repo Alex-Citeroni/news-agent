@@ -17,6 +17,7 @@
  *                              names documented in README.md
  */
 
+import { fileURLToPath } from 'node:url';
 import { getAgentConfig, AGENT_KEY_ENV } from './agents-config.js';
 
 const API_BASE = process.env.API_BASE || 'https://veii.ai';
@@ -167,7 +168,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Fatal:', err);
-  process.exit(1);
-});
+// Only run when executed directly, so the helpers above stay importable from
+// tests without the worker starting itself as a side effect of the import.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error('Fatal:', err);
+    process.exit(1);
+  });
+}

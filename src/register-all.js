@@ -9,6 +9,7 @@
  * Outputs API keys for each agent — save them as GitHub secrets.
  */
 
+import { fileURLToPath } from 'node:url';
 import { getAllAgents } from './agents-config.js';
 
 const API_BASE = process.env.API_BASE || 'https://veii.ai';
@@ -77,4 +78,8 @@ async function main() {
   console.log('\nDone.\n');
 }
 
-main().catch(console.error);
+// Only run when executed directly. This one registers 26 agents against the
+// live API, so an accidental import must not be able to fire it.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(console.error);
+}

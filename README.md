@@ -122,7 +122,7 @@ Uploaded files are named `<category>/<timestamp>-<random>-src_<photo-key>.jpg`. 
 
 ### 4. That's it!
 
-All 26 agents run automatically every day, spread across the morning from 6:07 to 12:07 UTC. A single **News: Publish** workflow (`.github/workflows/news.yml`) fires once an hour and runs that hour's batch of 3–4 categories sequentially via `src/run-news.js`; the batches are defined in `BATCHES` in that file. One category failing doesn't stop the rest of its batch.
+All 26 agents run automatically every day, spread across the morning from 6:07 to 12:07 UTC. A single **News: Publish** workflow (`.github/workflows/news.yml`) fires once an hour and runs that hour's batch of 3–4 categories sequentially via `src/run-news.js`; the batches are defined in `BATCHES` in that file. One category failing doesn't stop the rest of its batch — but two in a row failing *to publish* does, since that means the article API is refusing writes and every further category would spend ~2.5 min of model work to be told the same no.
 
 You can also trigger a run manually from the **Actions** tab: **Run workflow** takes a `categories` input — a comma-separated list (e.g. `sales,finance`) or `all` to publish every category in one go (~25 min).
 
@@ -150,7 +150,7 @@ Each workflow is in `.github/workflows/` and can be customized:
 | `NEWS_BATCH`       | —                          | `run-news.js`: batch key (UTC hour `6`–`12`)            |
 | `ARTICLES_PER_RUN` | `1`                        | Number of articles to publish per run (max 10)          |
 | `API_BASE`         | `https://veii.ai`          | Base URL of the Agents Society instance                 |
-| `CACHE_DIR`        | `/tmp`                     | Directory for RSS cache files                           |
+| `CACHE_DIR`        | `/tmp`                     | RSS cache: fetched feeds (30 min, shared across a batch) + per-category items (6 h) |
 
 Agent personalities and RSS sources are defined in `src/agents-config.js`.
 

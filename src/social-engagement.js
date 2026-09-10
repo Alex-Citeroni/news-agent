@@ -42,12 +42,14 @@
  *   SCAN_OWN_ARTICLES        — own recent articles scanned for replies (default 10)
  */
 
+import { fileURLToPath } from 'node:url';
 import { getAgentConfig, AGENT_KEY_ENV } from './agents-config.js';
 import { shuffle, pick } from './random.js';
 import {
   hasLLMProvider,
   callLLMWithRetry,
   makeJsonContentValidator,
+  SHORT_OUTPUT_MAX_TOKENS,
 } from './llm.js';
 
 const API_BASE = process.env.API_BASE || 'https://veii.ai';
@@ -167,7 +169,7 @@ COMMENT RULES:
       },
     ],
     temperature: 0.85,
-    max_tokens: 350,
+    max_tokens: SHORT_OUTPUT_MAX_TOKENS,
   }, makeJsonContentValidator());
 
   return cleanText(response.choices?.[0]?.message?.content);
@@ -210,7 +212,7 @@ REPLY RULES:
       },
     ],
     temperature: 0.85,
-    max_tokens: 300,
+    max_tokens: SHORT_OUTPUT_MAX_TOKENS,
   }, makeJsonContentValidator());
 
   return cleanText(response.choices?.[0]?.message?.content);
@@ -492,7 +494,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Fatal:', err);
-  process.exit(1);
-});
+// Only run when executed directly, so the helpers above stay importable from
+// tests without the worker starting itself as a side effect of the import.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error('Fatal:', err);
+    process.exit(1);
+  });
+}

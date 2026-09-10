@@ -1,9 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { RSS_SOURCES, getSourcesForCategory } from './rss-sources.js';
 import { getAllAgents, getRssSources, AGENT_KEY_ENV } from './agents-config.js';
 import { isDuplicate, photoKeyFromUrl, photoKeySuffix, collectUsedPhotoKeys } from './dedup.js';
 import { BATCHES, resolveCategories } from './run-news.js';
+import { EXIT_FAILED, EXIT_PUBLISH_FAILED } from './exit-codes.js';
 import { shuffle, pick } from './random.js';
 import {
   orderNewsItems,
@@ -12,6 +18,7 @@ import {
   formatPhotoCredit,
   appendPhotoCredit,
   wrapHeadline,
+  isRetryableHttpStatus,
   buildOverlaySvg,
   escapeXml,
 } from './index.js';
@@ -60,6 +67,21 @@ describe('Agents Config', () => {
       assert.ok(agent.category, `Agent ${agent.username} missing category`);
       assert.ok(Array.isArray(agent.rss_sources), `Agent ${agent.username} missing rss_sources`);
       assert.ok(agent.rss_sources.length > 0, `Agent ${agent.username} has no rss_sources`);
+    }
+  });
+
+  it('no agent lists the same feed twice', () => {
+    // Guards bulk source edits: swapping a dead feed for a working one across
+    // every agent (VentureBeat → The Decoder, 2026-09-10) silently doubles a
+    // source for any agent that already carried the replacement, and a doubled
+    // feed is a doubled fetch whose items then compete with themselves.
+    for (const agent of getAllAgents()) {
+      const urls = agent.rss_sources.map((s) => s.url);
+      assert.strictEqual(
+        new Set(urls).size,
+        urls.length,
+        `Agent ${agent.username} lists a feed twice: ${urls.join(', ')}`
+      );
     }
   });
 
@@ -542,5 +564,67 @@ describe('News batches', () => {
     assert.throws(() => resolveCategories({ NEWS_CATEGORIES: 'nope' }), /Unknown categories/);
     assert.throws(() => resolveCategories({ NEWS_BATCH: '99' }), /Unknown NEWS_BATCH/);
     assert.throws(() => resolveCategories({}), /Nothing to run/);
+  });
+});
+
+describe('Batch abort on publish failure', () => {
+  const RUNNER = fileURLToPath(new URL('./run-news.js', import.meta.url));
+
+  /**
+   * Run the batch runner over three categories against a stub child that exits
+   * with `code` every time, and return what the operator would see.
+   */
+  const runBatch = (code) => {
+    const dir = mkdtempSync(join(tmpdir(), 'news-batch-'));
+    const stub = join(dir, 'stub.mjs');
+    writeFileSync(stub, `console.log('stub for ' + process.env.NEWS_CATEGORY); process.exit(${code});\n`);
+
+    try {
+      execFileSync(process.execPath, [RUNNER], {
+        encoding: 'utf-8',
+        env: {
+          ...process.env,
+          NEWS_INDEX_PATH: stub,
+          NEWS_CATEGORIES: 'revops,sales,marketing',
+          AGENT_API_KEY_REVOPS: 'x',
+          AGENT_API_KEY_SALES: 'x',
+          AGENT_API_KEY_MARKETING: 'x',
+        },
+      });
+      assert.fail('a failing batch should exit non-zero');
+    } catch (err) {
+      // execFileSync throws on non-zero exit; the output is what we're after.
+      return `${err.stdout || ''}${err.stderr || ''}`;
+    }
+  };
+
+  it('stops the batch after two categories in a row fail to publish', () => {
+    const out = runBatch(EXIT_PUBLISH_FAILED);
+    assert.match(out, /Aborting batch: 2 categories in a row could not publish/);
+    assert.match(out, /Not run \(batch aborted\): marketing/);
+    assert.doesNotMatch(out, /stub for marketing/, 'third category should never have started');
+  });
+
+  it('keeps going when the failures are not publish failures', () => {
+    const out = runBatch(EXIT_FAILED);
+    assert.match(out, /stub for marketing/, 'a bad feed in two categories must not stop the batch');
+    assert.doesNotMatch(out, /Aborting batch/);
+  });
+});
+
+describe('Publish retry rule', () => {
+  it('retries what can change: rate limits, request timeouts, server faults', () => {
+    for (const status of [429, 408, 500, 502, 503, 504]) {
+      assert.ok(isRetryableHttpStatus(status), `${status} should be retried`);
+    }
+  });
+
+  it('does not retry a refusal of this exact request', () => {
+    // 400 (title over the cap, unknown category), 401 (revoked key), 403, 404
+    // (wrong API_BASE), 413 — three attempts with backoff buy nothing here but
+    // six seconds and a later, blurrier error message.
+    for (const status of [400, 401, 403, 404, 409, 413, 422]) {
+      assert.ok(!isRetryableHttpStatus(status), `${status} should not be retried`);
+    }
   });
 });

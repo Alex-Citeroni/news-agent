@@ -23,6 +23,27 @@ const MAX_RETRY_WAIT_MS = 30_000;      // cap backoff/retry-after wait — switc
 const LLM_INITIAL_BACKOFF_MS = 3000;   // base for exponential backoff on retryable errors
 
 /**
+ * `max_tokens` floor for calls whose visible output is short (a few queries, a
+ * headline, a comment).
+ *
+ * It has to be far larger than the answer, because every reasoning model in the
+ * chain bills its thinking against this same budget: Gemini 2.5/3.5 Flash and
+ * Groq's `gpt-oss-120b` think first and emit second, so a tight cap is spent
+ * before the answer starts. The failure is silent-ish and expensive — the SDK
+ * returns `finish_reason: 'length'` with partial or empty content, which the
+ * validator (correctly) rejects, so the call walks the whole provider chain.
+ *
+ * Seen on 2026-09-10 with a 400-token cap on the image-keyword call: three
+ * Gemini slots returned "response truncated (max_tokens reached)" in a row and
+ * Groq answered `json_validate_failed` with an empty `failed_generation` — four
+ * providers burned, every run, every agent, for ~60 tokens of output.
+ *
+ * This is a ceiling, not an allocation: raising it costs nothing when the model
+ * stops early, which is the normal case.
+ */
+export const SHORT_OUTPUT_MAX_TOKENS = 2048;
+
+/**
  * Build ordered list of LLM providers.
  * Each provider has: name, client, model.
  * Providers are tried in order; unavailable ones (no API key) are skipped.

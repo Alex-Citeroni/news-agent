@@ -15,7 +15,7 @@ const AGENTS = {
       { name: 'The Verge - AI', url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml', keywords: ['model', 'llm', 'gpt', 'claude', 'gemini', 'llama', 'mistral', 'trend'] },
       { name: 'OpenAI News', url: 'https://openai.com/news/rss.xml', keywords: ['model', 'release', 'update', 'research', 'gpt', 'o1', 'o3'] },
       { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/technology-lab', keywords: ['language model', 'llm', 'gpt', 'claude', 'gemini', 'llama', 'ai trend'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['model', 'llm', 'foundation', 'benchmark', 'training', 'trend', 'shift'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['model', 'llm', 'foundation', 'benchmark', 'training', 'trend', 'shift'] },
     ],
   },
 
@@ -30,7 +30,7 @@ const AGENTS = {
       { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml', keywords: ['tool', 'model', 'release', 'space', 'library', 'pipeline', 'demo'] },
       { name: 'LangChain Blog', url: 'https://www.langchain.com/blog/rss.xml', keywords: ['tool', 'release', 'integration', 'feature', 'update', 'launch'] },
       { name: 'The Verge - Tech', url: 'https://www.theverge.com/rss/tech/index.xml', keywords: ['ai tool', 'ai app', 'chatbot', 'ai feature', 'copilot', 'automation'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['tool', 'platform', 'product', 'launch', 'app', 'saas'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['tool', 'platform', 'product', 'launch', 'app', 'saas'] },
     ],
   },
 
@@ -45,7 +45,7 @@ const AGENTS = {
       { name: 'Salesforce Blog', url: 'https://www.salesforce.com/blog/feed/', keywords: ['ai', 'einstein', 'sales', 'crm', 'automation', 'agent', 'revenue'] },
       // Replaced GTMnow (gtmnow.com/feed/ now answers 403 to every client).
       { name: 'SaaStr', url: 'https://www.saastr.com/feed/', keywords: ['ai', 'sales', 'revenue', 'pipeline', 'prospect', 'outbound', 'tool', 'automation'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['sales', 'crm', 'revenue', 'pipeline', 'prospect', 'deal', 'salesforce'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['sales', 'crm', 'revenue', 'pipeline', 'prospect', 'deal', 'salesforce'] },
     ],
   },
 
@@ -59,7 +59,7 @@ const AGENTS = {
       { name: 'HubSpot Marketing Blog', url: 'https://blog.hubspot.com/marketing/rss.xml', keywords: ['ai', 'automation', 'content', 'campaign', 'seo', 'email', 'personalization'] },
       { name: 'MarTech', url: 'https://martech.org/feed/', keywords: ['ai', 'marketing', 'martech', 'automation', 'personalization', 'analytics', 'content'] },
       { name: 'Content Marketing Institute', url: 'https://contentmarketinginstitute.com/rss.xml', keywords: ['ai', 'content', 'strategy', 'automation', 'creative', 'tool'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['marketing', 'content', 'ad', 'campaign', 'brand', 'personalization', 'creative'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['marketing', 'content', 'ad', 'campaign', 'brand', 'personalization', 'creative'] },
     ],
   },
 
@@ -87,7 +87,7 @@ const AGENTS = {
       { name: 'Supply Chain Dive', url: 'https://www.supplychaindive.com/feeds/news/', keywords: ['ai', 'automation', 'robot', 'optimization', 'forecast', 'logistics', 'warehouse'] },
       { name: 'McKinsey Insights', url: 'https://www.mckinsey.com/insights/rss', keywords: ['operations', 'supply chain', 'automation', 'efficiency', 'ai', 'digital', 'process'] },
       { name: 'SupplyChainBrain', url: 'https://www.supplychainbrain.com/rss/articles', keywords: ['ai', 'automation', 'optimization', 'logistics', 'warehouse', 'forecast'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['operations', 'supply chain', 'logistics', 'process', 'efficiency', 'optimization'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['operations', 'supply chain', 'logistics', 'process', 'efficiency', 'optimization'] },
     ],
   },
 
@@ -100,7 +100,7 @@ const AGENTS = {
     rss_sources: [
       { name: 'Finextra', url: 'https://www.finextra.com/rss/headlines.aspx', keywords: ['ai', 'machine learning', 'automation', 'fraud', 'fintech', 'banking', 'payment'] },
       { name: 'TechCrunch - Fintech', url: 'https://techcrunch.com/category/fintech/feed/', keywords: ['ai', 'finance', 'banking', 'trading', 'accounting', 'fintech', 'fraud'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['finance', 'banking', 'trading', 'accounting', 'fintech', 'fraud detection'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['finance', 'banking', 'trading', 'accounting', 'fintech', 'fraud detection'] },
       { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', keywords: ['finance', 'banking', 'financial', 'trading', 'fintech'] },
     ],
   },
@@ -115,7 +115,7 @@ const AGENTS = {
       { name: 'RevOps Co-op', url: 'https://revopscoop.substack.com/feed', keywords: ['revops', 'revenue', 'forecast', 'attribution', 'data', 'pipeline', 'ops'] },
       { name: 'Tomasz Tunguz', url: 'https://tomtunguz.com/index.xml', keywords: ['revops', 'revenue', 'gtm', 'forecast', 'attribution', 'pipeline', 'data'] },
       { name: 'HubSpot Sales Blog', url: 'https://blog.hubspot.com/sales/rss.xml', keywords: ['revops', 'revenue', 'forecast', 'crm', 'analytics', 'pipeline', 'data'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['revenue', 'forecast', 'analytics', 'attribution', 'data pipeline', 'crm'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['revenue', 'forecast', 'analytics', 'attribution', 'data pipeline', 'crm'] },
     ],
   },
 
@@ -128,7 +128,7 @@ const AGENTS = {
     rss_sources: [
       { name: 'HR Dive', url: 'https://www.hrdive.com/feeds/news/', keywords: ['ai', 'automation', 'recruiting', 'hiring', 'talent', 'hr tech', 'workforce', 'employee'] },
       { name: 'Workable Blog', url: 'https://resources.workable.com/feed', keywords: ['ai', 'recruiting', 'hiring', 'candidate', 'screening', 'interview', 'talent'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['hr', 'recruiting', 'hiring', 'talent', 'resume', 'interview', 'workforce'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['hr', 'recruiting', 'hiring', 'talent', 'resume', 'interview', 'workforce'] },
       { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', keywords: ['hiring', 'recruiting', 'workforce', 'bias', 'employment', 'hr'] },
       { name: 'Best Tech Partner', url: 'https://www.besttechpartner.ai/feed/', keywords: ['ai', 'intelligenza artificiale', 'agent', 'pmi', 'automazione', 'recruiting', 'hr', 'assunzioni', 'lavoro'] },
     ],
@@ -144,7 +144,7 @@ const AGENTS = {
       { name: 'McKinsey Insights', url: 'https://www.mckinsey.com/insights/rss', keywords: ['ai', 'strategy', 'competitive', 'transform', 'leader', 'digital', 'organization'] },
       { name: 'Sequoia Capital', url: 'https://medium.com/feed/sequoia-capital', keywords: ['ai', 'strategy', 'market', 'competitive', 'moat', 'platform', 'build'] },
       { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', keywords: ['strategy', 'competitive', 'market', 'leader', 'executive', 'transform', 'business'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['strategy', 'competitive', 'market', 'enterprise', 'transform', 'leader'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['strategy', 'competitive', 'market', 'enterprise', 'transform', 'leader'] },
     ],
   },
 
@@ -173,7 +173,7 @@ const AGENTS = {
       { name: 'Made by Agents', url: 'https://www.madebyagents.com/rss/ai-agents', keywords: ['agent', 'autonomous', 'agentic', 'deploy', 'framework', 'multi-agent'] },
       { name: 'The Verge - AI', url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml', keywords: ['agent', 'autonomous', 'chatbot', 'assistant', 'copilot', 'agentic'] },
       { name: 'TechCrunch - AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', keywords: ['agent', 'autonomous', 'assistant', 'copilot', 'agentic', 'workflow'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['agent', 'autonomous', 'agentic', 'orchestration'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['agent', 'autonomous', 'agentic', 'orchestration'] },
     ],
   },
 
@@ -201,7 +201,7 @@ const AGENTS = {
       { name: 'UiPath Blog', url: 'https://www.uipath.com/blog/rss.xml', keywords: ['ai', 'rpa', 'automation', 'robot', 'process', 'document', 'intelligent'] },
       { name: 'Zapier Blog', url: 'https://zapier.com/blog/feeds/latest/', keywords: ['automation', 'automate', 'workflow', 'ai', 'bot', 'integration'] },
       { name: 'n8n Blog', url: 'https://blog.n8n.io/rss/', keywords: ['automation', 'automate', 'workflow', 'ai', 'bot', 'rpa'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['automation', 'rpa', 'robotic process', 'automate', 'workflow', 'bot'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['automation', 'rpa', 'robotic process', 'automate', 'workflow', 'bot'] },
     ],
   },
 
@@ -213,7 +213,7 @@ const AGENTS = {
     category: 'customer_support',
     rss_sources: [
       { name: 'Intercom Blog', url: 'https://www.intercom.com/blog/feed/', keywords: ['ai', 'support', 'chatbot', 'customer', 'ticket', 'resolution', 'agent', 'automation'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['customer support', 'chatbot', 'helpdesk', 'ticket', 'customer service', 'cx'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['customer support', 'chatbot', 'helpdesk', 'ticket', 'customer service', 'cx'] },
       { name: 'TechCrunch - AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', keywords: ['support', 'chatbot', 'customer service', 'helpdesk', 'ticket', 'cx'] },
       { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', keywords: ['customer', 'support', 'chatbot', 'service', 'cx'] },
     ],
@@ -255,7 +255,7 @@ const AGENTS = {
     system_prompt: 'You are a practical AI journalist who loves concrete examples. You write case studies, not hype pieces. You always include specific numbers, timelines, and lessons learned. You are skeptical of "we saved 10x" claims without evidence and enthusiastic about honest, detailed implementation stories. Your tone is practical, instructive, and solution-oriented.',
     category: 'use_cases',
     rss_sources: [
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['use case', 'implementation', 'deploy', 'customer', 'support', 'sales', 'automate', 'workflow'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['use case', 'implementation', 'deploy', 'customer', 'support', 'sales', 'automate', 'workflow'] },
       { name: 'McKinsey Insights', url: 'https://www.mckinsey.com/insights/rss', keywords: ['use case', 'implementation', 'deploy', 'transform', 'case study', 'ai'] },
       { name: 'TechCrunch - AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', keywords: ['use case', 'customer', 'implement', 'automate', 'workflow', 'solution'] },
       { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', keywords: ['use case', 'application', 'deploy', 'implement', 'real-world'] },
@@ -286,7 +286,7 @@ const AGENTS = {
       { name: 'Y Combinator Blog', url: 'https://www.ycombinator.com/blog/rss', keywords: ['how to', 'guide', 'build', 'implement', 'deploy', 'lesson', 'playbook', 'ai'] },
       { name: 'Sequoia Capital', url: 'https://medium.com/feed/sequoia-capital', keywords: ['playbook', 'guide', 'framework', 'implement', 'build', 'scale', 'ai'] },
       { name: 'McKinsey Insights', url: 'https://www.mckinsey.com/insights/rss', keywords: ['guide', 'implement', 'deploy', 'practice', 'methodology', 'framework', 'ai'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['playbook', 'guide', 'how to', 'implement', 'deploy', 'step', 'best practice'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['playbook', 'guide', 'how to', 'implement', 'deploy', 'step', 'best practice'] },
     ],
   },
 
@@ -327,7 +327,7 @@ const AGENTS = {
     rss_sources: [
       { name: 'McKinsey Insights', url: 'https://www.mckinsey.com/insights/rss', keywords: ['digital labor', 'ai worker', 'automation', 'workforce', 'productivity', 'digital', 'talent'] },
       { name: 'Made by Agents', url: 'https://www.madebyagents.com/rss/ai-agents', keywords: ['digital labor', 'ai worker', 'virtual', 'autonomous', 'employee', 'workforce'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['digital labor', 'ai worker', 'virtual assistant', 'ai employee', 'digital workforce'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['digital labor', 'ai worker', 'virtual assistant', 'ai employee', 'digital workforce'] },
       { name: 'TechCrunch - AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', keywords: ['digital labor', 'ai worker', 'virtual assistant', 'automate', 'workforce'] },
     ],
   },
@@ -342,7 +342,7 @@ const AGENTS = {
       { name: 'Made by Agents', url: 'https://www.madebyagents.com/rss/ai-agents', keywords: ['economy', 'marketplace', 'agent', 'platform', 'commerce', 'interop', 'ecosystem'] },
       { name: 'LangChain Blog', url: 'https://www.langchain.com/blog/rss.xml', keywords: ['marketplace', 'ecosystem', 'platform', 'agent', 'interop', 'multi-agent'] },
       { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', keywords: ['ai agent', 'agent economy', 'marketplace', 'autonomous', 'commerce'] },
-      { name: 'VentureBeat - AI', url: 'https://venturebeat.com/category/ai/feed/', keywords: ['agent economy', 'marketplace', 'platform', 'ecosystem', 'interop'] },
+      { name: 'The Decoder', url: 'https://the-decoder.com/feed/', keywords: ['agent economy', 'marketplace', 'platform', 'ecosystem', 'interop'] },
     ],
   },
 

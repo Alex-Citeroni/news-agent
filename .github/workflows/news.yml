@@ -72,6 +72,11 @@ jobs:
         uses: actions/cache@v5
         with:
           # One entry per batch, covering every category file it writes.
+          #
+          # Deliberately NOT /tmp/*.json: the per-URL feed cache the run also
+          # writes (/tmp/feed-<hash>.json) is meant to live for the length of
+          # one batch and no longer. Restoring it across runs would serve the
+          # next hour's agents the previous hour's news.
           path: /tmp/news-cache-*.json
           key: news-cache-${{ steps.batch.outputs.label }}-${{ github.run_id }}
           restore-keys: |

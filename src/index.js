@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import Parser from 'rss-parser';
 import sharp from 'sharp';
@@ -7,12 +8,14 @@ import { getSourcesForCategory } from './rss-sources.js';
 import { getAgentConfig } from './agents-config.js';
 import { shuffle, pick } from './random.js';
 import { isDuplicate, photoKeyFromUrl, photoKeySuffix, collectUsedPhotoKeys } from './dedup.js';
+import { EXIT_FAILED, EXIT_PUBLISH_FAILED } from './exit-codes.js';
 import {
   LLM_PROVIDERS,
   hasLLMProvider,
   callLLMWithRetry,
   extractJSON,
   makeJsonContentValidator,
+  SHORT_OUTPUT_MAX_TOKENS,
 } from './llm.js';
 
 const API_BASE = process.env.API_BASE || 'https://veii.ai';
@@ -69,13 +72,29 @@ const FEED_HEADERS = {
  * like a broken feed rather than a moved one, and cost real debugging time.
  */
 async function fetchFeed(url) {
-  const res = await fetchWithTimeout(url, { headers: FEED_HEADERS, redirect: 'follow' }, FEED_TIMEOUT_MS);
-  if (!res.ok) throw new Error(`Status code ${res.status}`);
-  const body = await res.text();
-  if (!/^\s*(<\?xml|<rss|<feed|<rdf:RDF)/i.test(body.slice(0, 300))) {
-    const dest = res.url !== url ? ` (redirected to ${res.url})` : '';
-    throw new Error(`not a feed — served ${res.headers.get('content-type') || 'unknown content'}${dest}`);
+  const cached = readFeedCache(url);
+  if (cached) {
+    if (cached.error) throw new Error(`${cached.error} (cached)`);
+    return parser.parseString(cached.body);
   }
+
+  let body;
+  try {
+    const res = await fetchWithTimeout(url, { headers: FEED_HEADERS, redirect: 'follow' }, FEED_TIMEOUT_MS);
+    if (!res.ok) throw new Error(`Status code ${res.status}`);
+    body = await res.text();
+    if (!/^\s*(<\?xml|<rss|<feed|<rdf:RDF)/i.test(body.slice(0, 300))) {
+      const dest = res.url !== url ? ` (redirected to ${res.url})` : '';
+      throw new Error(`not a feed — served ${res.headers.get('content-type') || 'unknown content'}${dest}`);
+    }
+  } catch (err) {
+    // Failures are cached too, and deliberately: the thing they prevent is the
+    // next category asking a publisher that JUST rate-limited us to do it again.
+    writeFeedCache(url, { error: err.message });
+    throw err;
+  }
+
+  writeFeedCache(url, { body });
   return parser.parseString(body);
 }
 
@@ -94,6 +113,47 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS)
 
 const CACHE_DIR = process.env.CACHE_DIR || '/tmp';
 const CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+/**
+ * Feed responses, cached by URL across the categories of one batch.
+ *
+ * The per-category cache below stores *filtered items*, so it does nothing for
+ * the case that actually costs us: a batch runs four categories in one job,
+ * minutes apart on one runner, and their source lists overlap heavily (every
+ * agent carries a generalist AI feed, and the default set besides). Each
+ * category was re-asking the same publishers for the same bytes — which is how
+ * a feed ends up answering 429 halfway through a batch.
+ *
+ * 30 minutes is chosen to be longer than a batch (~10 min) and shorter than the
+ * gap to the next one (hourly), so categories in a batch share one fetch and
+ * the following hour still sees fresh news.
+ */
+const FEED_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+
+function feedCachePath(url) {
+  return `${CACHE_DIR}/feed-${createHash('sha1').update(url).digest('hex').slice(0, 16)}.json`;
+}
+
+/** Cached `{ body }` or `{ error }` for this URL, or null when absent/stale. */
+function readFeedCache(url) {
+  try {
+    const path = feedCachePath(url);
+    if (!existsSync(path)) return null;
+    const data = JSON.parse(readFileSync(path, 'utf-8'));
+    if (Date.now() - data.timestamp > FEED_CACHE_MAX_AGE_MS) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeFeedCache(url, entry) {
+  try {
+    writeFileSync(feedCachePath(url), JSON.stringify({ timestamp: Date.now(), ...entry }));
+  } catch {
+    // A cache that can't be written is a slow batch, not a broken one.
+  }
+}
 
 /**
  * Read cached fresh items if available and not expired
@@ -316,6 +376,19 @@ CRITICAL: The "body" field must be a single JSON string. Use \\n\\n for paragrap
 }
 
 /**
+ * Whether an HTTP failure is worth sending the same request again.
+ *
+ * A refusal of THIS request will refuse it again: a title over the cap, an
+ * unknown category, a revoked key. Only a rate limit or a request timeout is
+ * worth waiting out, plus 5xx, where the request was fine and the server was
+ * not. Everything else in 4xx is an answer, not a hiccup, and re-sending it
+ * just delays reading it.
+ */
+export function isRetryableHttpStatus(status) {
+  return status === 429 || status === 408 || status >= 500;
+}
+
+/**
  * Publish article with all translations in a single API call
  */
 async function publishArticle(article, translations) {
@@ -356,16 +429,33 @@ async function publishArticle(article, translations) {
       try {
         data = JSON.parse(text);
       } catch {
-        throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 200)}`);
+        // An HTML 404 from a wrong API_BASE will not become JSON on the second
+        // try, while a 502 from a proxy might.
+        const err = new Error(`Non-JSON response (HTTP ${res.status}): ${text.slice(0, 200)}`);
+        err.retryable = isRetryableHttpStatus(res.status);
+        throw err;
       }
 
       if (!data.success) {
-        throw new Error(`Failed to publish: ${data.error || res.status}`);
+        // Always carry the status, not just the message. `data.error` alone is
+        // ambiguous in the way that costs the most time: "Failed to create
+        // article" reads like a payload the API disliked, when HTTP 500 says
+        // the payload was fine and the write blew up behind it (the reason is
+        // in the server logs). 4xx means fix the request, 5xx means look there.
+        const err = new Error(`Failed to publish (HTTP ${res.status}): ${data.error || 'no reason given'}`);
+        err.retryable = isRetryableHttpStatus(res.status);
+        throw err;
       }
 
       return data.data;
     } catch (err) {
       lastErr = err;
+      // Transport-level failures (abort, ECONNRESET) carry no status and are
+      // exactly the case retrying exists for, so they default to retryable.
+      if (err.retryable === false) {
+        console.warn(`  publish: ${err.message} — not retryable, giving up`);
+        break;
+      }
       if (attempt < MAX_PUBLISH_ATTEMPTS) {
         const waitMs = 2000 * attempt;
         console.warn(`  publish: attempt ${attempt} failed (${err.message}), retrying in ${waitMs}ms...`);
@@ -373,7 +463,12 @@ async function publishArticle(article, translations) {
       }
     }
   }
-  throw lastErr;
+  // Tagged so the batch runner can tell a publish refusal from a bad feed or a
+  // dead LLM chain: when the API says no to everyone, running the next category
+  // just buys the same answer at the price of another article. See exit-codes.js.
+  const failure = lastErr instanceof Error ? lastErr : new Error(`Failed to publish: ${lastErr}`);
+  failure.exitCode = EXIT_PUBLISH_FAILED;
+  throw failure;
 }
 
 /**
@@ -464,7 +559,7 @@ Headline rules:
         },
       ],
       temperature: 0.5,
-      max_tokens: 400,
+      max_tokens: SHORT_OUTPUT_MAX_TOKENS,
       response_format: { type: 'json_object' },
     }, makeJsonContentValidator(['queries']));
 
@@ -1243,8 +1338,16 @@ async function main() {
     console.warn(`  Image search error: ${imageResult.reason?.message}`);
   }
 
-  // Apply translations
-  const translations = { en: { title: article.title, body: article.body, summary: article.summary, seo_title: article.seo_title, meta_description: article.meta_description } };
+  // Apply translations.
+  //
+  // No `en` entry: the article IS English, so sending one only asked the API
+  // to write `title_en`/`body_en`/... — a byte-for-byte copy of the base
+  // columns. Those columns were dropped in production on 2026-09-10, and the
+  // copy is what made every publish fail with "Failed to create article"
+  // (PostgREST 42703, column does not exist). Readers resolve
+  // `article[`body_${locale}`] || article.body`, so English renders from the
+  // base columns exactly as it did.
+  const translations = {};
   for (let i = 0; i < langs.length; i++) {
     if (translationResults[i].status === 'fulfilled') {
       translations[langs[i].code] = translationResults[i].value;
@@ -1293,6 +1396,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     .then(() => process.exit(0))
     .catch((err) => {
       console.error('Fatal error:', err);
-      process.exit(1);
+      process.exit(err?.exitCode || EXIT_FAILED);
     });
 }
