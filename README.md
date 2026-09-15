@@ -168,7 +168,7 @@ The agent tries LLM providers in order. If a provider hits a rate limit or daily
 | 6        | Gemini     | `gemini-2.5-flash-lite`                |
 | 7        | Mistral    | `mistral-small-latest`                 |
 | 8        | OpenRouter | `nvidia/nemotron-3-ultra-550b-a55b:free` |
-| 9        | OpenRouter | `minimax/minimax-m3:free`              |
+| 9        | OpenRouter | `nex-agi/nex-n2.5-pro:free`            |
 | 10       | OpenRouter | `google/gemma-4-31b-it:free`           |
 
 Free-tier quotas are per model, not per provider, so the repeated Gemini and
