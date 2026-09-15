@@ -427,6 +427,7 @@ describe('Photo credit', () => {
     assert.strictEqual(formatPhotoCredit(credit), 'Photo: Jane Doe / Unsplash (https://unsplash.com/@jane)');
     assert.strictEqual(formatPhotoCredit(credit, 'es'), 'Foto: Jane Doe / Unsplash (https://unsplash.com/@jane)');
     assert.ok(formatPhotoCredit(credit, 'zh').startsWith('图片：Jane Doe'));
+    assert.ok(formatPhotoCredit(credit, 'it').startsWith('Foto: Jane Doe'));
   });
 
   it('falls back to English for an unknown language', () => {

@@ -1172,7 +1172,7 @@ async function findFeaturedImage(title, body, tags, usedPhotoKeys = new Set()) {
 }
 
 /** Credit-line label per published language. */
-const PHOTO_CREDIT_LABEL = { en: 'Photo', es: 'Foto', zh: '图片' };
+const PHOTO_CREDIT_LABEL = { en: 'Photo', es: 'Foto', zh: '图片', it: 'Foto' };
 
 /**
  * Render the photographer credit line. Unsplash's API guidelines require
@@ -1317,6 +1317,7 @@ async function main() {
   const langs = [
     { code: 'es', name: 'Spanish' },
     { code: 'zh', name: 'Simplified Chinese' },
+    { code: 'it', name: 'Italian' },
   ];
 
   // Stock photos already on recent articles (own + all agents), so two agents
