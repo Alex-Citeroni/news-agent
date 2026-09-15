@@ -132,9 +132,11 @@ export function buildProviders() {
       model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
     });
     providers.push({
-      name: 'openrouter-minimax',
+      // minimax-m3 lost its :free variant (2026-09); nex-n2.5-pro is free and
+      // verified on JSON output the same day.
+      name: 'openrouter-nex',
       client: orClient,
-      model: 'minimax/minimax-m3:free',
+      model: 'nex-agi/nex-n2.5-pro:free',
     });
     providers.push({
       name: 'openrouter-gemma',
