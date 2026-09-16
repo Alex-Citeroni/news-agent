@@ -1,5 +1,5 @@
 /**
- * Configuration for all 26 specialized news agents.
+ * Configuration for all 27 specialized news agents.
  * Each agent covers a specific category with tailored RSS sources and personality.
  */
 
@@ -360,6 +360,23 @@ const AGENTS = {
     ],
   },
 
+  robotics: {
+    username: 'robotics-desk',
+    display_name: 'Haruki Nakamura',
+    description: 'Robots that actually work — humanoids on real shifts, industrial arms, warehouse fleets, and the safety standards deciding what ships. Daily coverage of embodied AI.',
+    system_prompt: 'You are a robotics journalist who covers EMBODIED AI: humanoids, industrial arms, mobile manipulators, warehouse and logistics fleets. You have stood on factory floors and you write like it — a viral acrobatics demo is not a product, and you say so. You care about the numbers that decide deployments: cycle time, uptime, payload, cost per hour versus the human baseline, and the safety certification (ISO 10218, ISO/TS 15066) that gates a robot working near people. You are precise about who makes what, you separate a pilot from a rollout, and you are sceptical of unit counts nobody can verify. Your tone is grounded, technical, and free of both doom and hype.',
+    category: 'robotics',
+    rss_sources: [
+      // The platform's own robotic-labor desk — a humanoid-deployment beat
+      // no general tech feed covers at this depth. Broad keywords on purpose:
+      // every item in this feed is already on-topic for the category.
+      { name: 'myBender', url: 'https://mybender.ai/rss.xml', keywords: ['robot', 'humanoid', 'automation', 'labor', 'deployment', 'warehouse', 'manufacturing', 'ai'] },
+      { name: 'IEEE Spectrum - Robotics', url: 'https://spectrum.ieee.org/feeds/topic/robotics.rss', keywords: ['robot', 'humanoid', 'manipulation', 'actuator', 'autonomy', 'drone', 'legged', 'gripper'] },
+      { name: 'The Robot Report', url: 'https://www.therobotreport.com/feed/', keywords: ['robot', 'humanoid', 'warehouse', 'amr', 'cobot', 'automation', 'funding', 'deployment', 'logistics'] },
+      { name: 'Robohub', url: 'https://robohub.org/feed/', keywords: ['robot', 'humanoid', 'research', 'autonomy', 'manipulation', 'industry', 'society'] },
+    ],
+  },
+
   crypto_trading: {
     username: 'crypto-agent-watch',
     display_name: 'Connor Sinclair',
@@ -407,6 +424,7 @@ export const AGENT_KEY_ENV = {
   agent_economy: 'AGENT_API_KEY_AGENT_ECONOMY',
   funding: 'AGENT_API_KEY_FUNDING',
   crypto_trading: 'AGENT_API_KEY_CRYPTO_AGENTS',
+  robotics: 'AGENT_API_KEY_ROBOTICS',
 };
 
 /**

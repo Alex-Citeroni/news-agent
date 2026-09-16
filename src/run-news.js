@@ -48,7 +48,7 @@ export const BATCHES = {
   9: ['workflows', 'automation', 'customer_support', 'agent_builders'],
   10: ['challenges', 'use_cases', 'growth', 'playbooks'],
   11: ['ai_humans', 'future_of_work', 'digital_labor', 'agent_economy'],
-  12: ['funding', 'crypto_trading'],
+  12: ['funding', 'crypto_trading', 'robotics'],
 };
 
 /**

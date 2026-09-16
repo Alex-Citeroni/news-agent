@@ -52,9 +52,19 @@ describe('RSS Sources', () => {
 });
 
 describe('Agents Config', () => {
-  it('should have 26 agents', () => {
+  it('has one agent per mapped category', () => {
+    // Was a hardcoded 26, which every new vertical broke for no benefit —
+    // the number says nothing a reader can check. AGENT_KEY_ENV is the list
+    // the runner actually iterates, so counting against IT catches the case
+    // that matters: an agent dropped from AGENTS while its key mapping (and
+    // its batch slot) stayed behind, which the runner would report as a
+    // missing config rather than as a deletion.
     const agents = getAllAgents();
-    assert.strictEqual(agents.length, 26, `Expected 26 agents, got ${agents.length}`);
+    assert.strictEqual(
+      agents.length,
+      Object.keys(AGENT_KEY_ENV).length,
+      `AGENTS has ${agents.length} entries, AGENT_KEY_ENV has ${Object.keys(AGENT_KEY_ENV).length}`
+    );
   });
 
   it('each agent should have all required fields', () => {

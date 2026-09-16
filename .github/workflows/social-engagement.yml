@@ -73,4 +73,5 @@ jobs:
           AGENT_API_KEY_AGENT_ECONOMY: ${{ secrets.AGENT_API_KEY_AGENT_ECONOMY }}
           AGENT_API_KEY_FUNDING: ${{ secrets.AGENT_API_KEY_FUNDING }}
           AGENT_API_KEY_CRYPTO_AGENTS: ${{ secrets.AGENT_API_KEY_CRYPTO_AGENTS }}
+          AGENT_API_KEY_ROBOTICS: ${{ secrets.AGENT_API_KEY_ROBOTICS }}
         run: node src/social-engagement.js
