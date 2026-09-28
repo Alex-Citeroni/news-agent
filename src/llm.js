@@ -23,6 +23,27 @@ const MAX_RETRY_WAIT_MS = 30_000;      // cap backoff/retry-after wait — switc
 const LLM_INITIAL_BACKOFF_MS = 3000;   // base for exponential backoff on retryable errors
 
 /**
+ * How long a provider is skipped after a 429.
+ *
+ * A 429 is not retried on the same provider: every model has its own quota
+ * bucket and the chain has plenty of them, so moving on is always faster than
+ * backing off. Before this, every call re-discovered the same exhausted quota:
+ * in the 2026-09-27 runs all three Gemini slots 429'd on every call, costing
+ * ~28s of backoff before Groq answered. Social engagement makes ~80 calls per
+ * run, so it hit its 20-min timeout every time; news batches lost minutes too.
+ * Long enough to stop re-probing a dead quota, short enough that a per-minute
+ * limit recovers within one job.
+ */
+const RATE_LIMIT_COOLDOWN_MS = 5 * 60_000;
+
+/** provider name → timestamp until which it is skipped. Process-local. */
+const providerCooldownUntil = new Map();
+
+function isCoolingDown(provider, now = Date.now()) {
+  return (providerCooldownUntil.get(provider.name) || 0) > now;
+}
+
+/**
  * `max_tokens` floor for calls whose visible output is short (a few queries, a
  * headline, a comment).
  *
@@ -74,6 +95,10 @@ export function buildProviders() {
   // Current IDs: https://ai.google.dev/gemini-api/docs/models
   if (GEMINI_API_KEY) {
     providers.push(gemini('gemini', 'gemini-flash-latest'));
+    // No explicit gemini-3.8-flash: it is what `-latest` points at today, so
+    // it would share that slot's quota bucket.
+    providers.push(gemini('gemini-3.7-flash', 'gemini-3.7-flash'));
+    providers.push(gemini('gemini-3.6-flash', 'gemini-3.6-flash'));
     providers.push(gemini('gemini-3.5-flash', 'gemini-3.5-flash'));
     providers.push(gemini('gemini-2.5-flash', 'gemini-2.5-flash'));
   }
@@ -98,8 +123,10 @@ export function buildProviders() {
     });
   }
 
-  // Fallback 2: lower-tier Gemini — smaller model, yet another quota bucket.
+  // Fallback 2: lower-tier Gemini — smaller models, each yet another quota bucket.
   if (GEMINI_API_KEY) {
+    providers.push(gemini('gemini-3.5-flash-lite', 'gemini-3.5-flash-lite'));
+    providers.push(gemini('gemini-3.1-flash-lite', 'gemini-3.1-flash-lite'));
     providers.push(gemini('gemini-flash-lite', 'gemini-2.5-flash-lite'));
   }
 
@@ -179,8 +206,12 @@ export function extractJSON(text) {
 /** Providers that support response_format: json_object */
 const JSON_MODE_PROVIDERS = new Set([
   'gemini',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
   'gemini-3.5-flash',
   'gemini-2.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
   'gemini-flash-lite',
   'groq',
   'groq-qwen',
@@ -200,12 +231,17 @@ export async function callLLMWithRetry(params, validate) {
   let lastError = null;
   const deadline = Date.now() + LLM_CALL_BUDGET_MS;
 
-  for (let pi = 0; pi < LLM_PROVIDERS.length; pi++) {
+  // Skip rate-limited providers; if every one is cooling down, try them all
+  // anyway rather than failing without a single request.
+  const ready = LLM_PROVIDERS.filter((p) => !isCoolingDown(p));
+  const providers = ready.length > 0 ? ready : LLM_PROVIDERS;
+
+  for (let pi = 0; pi < providers.length; pi++) {
     if (Date.now() >= deadline) {
       console.warn(`  LLM call budget exhausted (${LLM_CALL_BUDGET_MS}ms), aborting`);
       break;
     }
-    const provider = LLM_PROVIDERS[pi];
+    const provider = providers[pi];
 
     for (let attempt = 1; attempt <= MAX_LLM_RETRIES; attempt++) {
       try {
@@ -236,19 +272,31 @@ export async function callLLMWithRetry(params, validate) {
         lastError = err;
         const isRetryable = err.status === 429 || err.status === 503 || err.status === 502 || err.status === 504 || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT' || err.message?.includes('timeout');
 
-        // Non-retryable error (404, 400, auth, etc.) — skip to next provider
+        // Non-retryable error (404, 400, auth, etc.) — skip to next provider.
+        // 403/404 mean the model is gone or not on this key's tier, which no
+        // later call will change, so stop asking for the rest of the run.
         if (!isRetryable) {
+          if (err.status === 403 || err.status === 404) providerCooldownUntil.set(provider.name, Infinity);
           console.warn(`  ${provider.name}: non-retryable error (${err.status || err.code}: ${err.message}), trying next provider...`);
           break;
         }
 
+        const message = err.message?.toLowerCase() || '';
         const isDailyLimit = err.headers?.['x-should-retry'] === 'false'
-          || err.message?.toLowerCase().includes('daily')
-          || err.message?.toLowerCase().includes('tokens per day');
+          || message.includes('daily')
+          || message.includes('per day')
+          || message.includes('perday');
 
-        // Daily limit or last retry — try next provider
-        if (isDailyLimit || attempt === MAX_LLM_RETRIES) {
-          console.warn(`  ${provider.name}: ${isDailyLimit ? 'daily limit reached' : 'max retries exhausted'}, trying next provider...`);
+        // Rate limited: park this provider and move on (see RATE_LIMIT_COOLDOWN_MS).
+        if (isDailyLimit || err.status === 429) {
+          providerCooldownUntil.set(provider.name, isDailyLimit ? Infinity : Date.now() + RATE_LIMIT_COOLDOWN_MS);
+          const reason = isDailyLimit ? 'daily limit reached' : `rate limited, skipping it for ${RATE_LIMIT_COOLDOWN_MS / 60_000} min`;
+          console.warn(`  ${provider.name}: ${reason} (${err.message?.slice(0, 160)}), trying next provider...`);
+          break;
+        }
+
+        if (attempt === MAX_LLM_RETRIES) {
+          console.warn(`  ${provider.name}: max retries exhausted, trying next provider...`);
           break;
         }
 

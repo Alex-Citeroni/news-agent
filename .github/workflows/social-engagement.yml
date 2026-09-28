@@ -28,6 +28,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
       # sharp is only used by index.js (image processing), so this job skips
       # its native postinstall entirely.
       - run: npm ci --ignore-scripts

@@ -47,6 +47,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
       - run: npm ci
       - name: Ensure sharp platform binaries
         run: node -e "require('sharp')" || npm install --no-save --os=linux --cpu=x64 sharp
