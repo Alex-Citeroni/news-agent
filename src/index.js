@@ -1172,7 +1172,7 @@ async function findFeaturedImage(title, body, tags, usedPhotoKeys = new Set()) {
 }
 
 /** Credit-line label per published language. */
-const PHOTO_CREDIT_LABEL = { en: 'Photo', es: 'Foto', zh: '图片', it: 'Foto' };
+const PHOTO_CREDIT_LABEL = { en: 'Photo', es: 'Foto', zh: '图片', it: 'Foto', fr: 'Photo' };
 
 /**
  * Render the photographer credit line. Unsplash's API guidelines require
@@ -1183,7 +1183,8 @@ const PHOTO_CREDIT_LABEL = { en: 'Photo', es: 'Foto', zh: '图片', it: 'Foto' }
 export function formatPhotoCredit(credit, lang = 'en') {
   if (!credit?.author || credit.author === 'unknown') return null;
   const label = PHOTO_CREDIT_LABEL[lang] || PHOTO_CREDIT_LABEL.en;
-  const separator = lang === 'zh' ? '：' : ': ';
+  // French sets a space before the colon ("Photo : Jane Doe").
+  const separator = lang === 'zh' ? '：' : lang === 'fr' ? ' : ' : ': ';
   const link = credit.authorUrl ? ` (${credit.authorUrl})` : '';
   return `${label}${separator}${credit.author} / ${credit.source}${link}`;
 }
@@ -1318,6 +1319,7 @@ async function main() {
     { code: 'es', name: 'Spanish' },
     { code: 'zh', name: 'Simplified Chinese' },
     { code: 'it', name: 'Italian' },
+    { code: 'fr', name: 'French' },
   ];
 
   // Stock photos already on recent articles (own + all agents), so two agents
