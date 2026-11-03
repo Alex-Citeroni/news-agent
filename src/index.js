@@ -9,6 +9,7 @@ import { getAgentConfig } from './agents-config.js';
 import { shuffle, pick } from './random.js';
 import { isDuplicate, photoKeyFromUrl, photoKeySuffix, collectUsedPhotoKeys } from './dedup.js';
 import { EXIT_FAILED, EXIT_PUBLISH_FAILED } from './exit-codes.js';
+import { fetchSourceText, findRelatedItems, appendSources, hasRequiredSections } from './source-text.js';
 import {
   LLM_PROVIDERS,
   hasLLMProvider,
@@ -32,13 +33,19 @@ const CATEGORY = process.env.NEWS_CATEGORY || 'ai_agents';
 const ARTICLES_PER_RUN = parseInt(process.env.ARTICLES_PER_RUN || '1', 10);
 const FETCH_TIMEOUT_MS = 15000;
 const PUBLISH_TIMEOUT_MS = 60_000;
+/**
+ * DRY_RUN=1: read the sources and write the English article, print it, stop.
+ * No heartbeat, image, translation or publish — for checking the prompt
+ * locally (`DRY_RUN=1 NEWS_CATEGORY=sales node src/index.js`).
+ */
+const DRY_RUN = process.env.DRY_RUN === '1';
 
 /**
  * Env preconditions. Checked when run as a script, not at import time, so the
  * module stays importable from tests.
  */
 function assertRequiredEnv() {
-  if (!AGENT_API_KEY) {
+  if (!AGENT_API_KEY && !DRY_RUN) {
     console.error('Missing required env var: AGENT_API_KEY');
     process.exit(1);
   }
@@ -221,7 +228,10 @@ async function fetchNews() {
     }
   }
 
-  return orderNewsItems(allItems).slice(0, ARTICLES_PER_RUN * 3);
+  // The whole pool, not just the top few: the candidates are read in order
+  // until one has a readable page, and the rest is where the other coverage
+  // of the chosen story comes from (findRelatedItems).
+  return orderNewsItems(allItems);
 }
 
 const DAY_MS = 86_400_000;
@@ -258,31 +268,84 @@ export function orderNewsItems(items) {
 }
 
 /**
- * Generate the original article in English with SEO metadata and geo-location
+ * Stories tried per run before giving up. Each costs one page fetch, no LLM
+ * call: an unreadable page is skipped before the model sees anything.
  */
-async function generateArticle(newsItems) {
+const MAX_CANDIDATES = 8;
+
+/**
+ * The first candidate whose page can be read, with up to two other
+ * publishers' coverage of the same story. Related pages that can't be read
+ * still count as coverage, with their feed snippet only — labelled as such
+ * in the prompt so the model doesn't treat a snippet as the full story.
+ */
+async function readNextStory(candidates, pool, tried) {
+  for (const item of candidates) {
+    if (tried.has(item.link)) continue;
+    tried.add(item.link);
+    const text = await fetchSourceText(item.link);
+    if (!text) {
+      console.log(`  Source not readable, skipping: ${item.link}`);
+      continue;
+    }
+    const related = findRelatedItems(item, pool);
+    const relatedTexts = await Promise.all(related.map((r) => fetchSourceText(r.link, { minChars: 600 })));
+    return {
+      main: { ...item, text },
+      related: related.map((r, i) => ({ ...r, text: relatedTexts[i] })),
+    };
+  }
+  return null;
+}
+
+/** The story as the model reads it: full texts, then snippets, each with its publisher. */
+function formatStoryForPrompt(story) {
+  const block = (label, s) => `${label}: "${s.title}" — ${s.source} (${s.link})\n${s.text || `[feed snippet only] ${s.snippet}`}`;
+  return [
+    block('MAIN SOURCE', story.main),
+    ...story.related.map((r, i) => block(`OTHER COVERAGE ${i + 1}`, r)),
+  ].join('\n\n---\n\n');
+}
+
+/**
+ * Generate the article in English from the story's sources, with SEO metadata
+ * and geo-location.
+ *
+ * What makes it worth reading, and not a rewrite of someone else's news: only
+ * facts the sources state, attributed; a thesis in the agent's own voice about
+ * what it means for a small team; and three things to do about it. The sources
+ * list is not asked of the model — main() appends it from the URLs it read.
+ */
+async function generateArticle(story) {
   const agentConfig = getAgentConfig(CATEGORY);
   const agentVoice = agentConfig?.system_prompt || '';
-
-  const newsList = newsItems
-    .map((item, i) => `[${i + 1}] "${item.title}" — ${item.snippet} (Source: ${item.source}, URL: ${item.link})`)
-    .join('\n\n');
 
   const response = await callLLMWithRetry({
     messages: [
       {
         role: 'system',
-        content: `You are an AI news journalist for "Agents Society", a social network where humans and AI agents coexist.
+        content: `You are an AI news analyst writing for Veii AI, a workspace where people and AI agents run small and mid-sized companies together. Your readers are owners and team leads at small companies. You are an AI agent and the article says so on the page; never pretend to have interviewed anyone, attended anything or tested anything yourself.
 
-YOUR EDITORIAL VOICE:
+YOUR EDITORIAL VOICE AND BEAT:
 ${agentVoice}
 
-ARTICLE RULES:
-- Pick the most interesting story about AI agents or AI technology
-- Write a completely ORIGINAL article (do NOT copy the source)
-- Professional journalistic style, 300-500 words
-- Include analysis about what this means for the AI ecosystem
-- Write with your unique editorial voice described above
+FACTS:
+- Use ONLY facts stated in the sources you are given. Never invent numbers, names, quotes, dates or results.
+- Attribute facts to the publisher you read them in ("according to TechCrunch", "The Verge reports"). When that publisher is itself citing another outlet, say so ("The Decoder, citing Bloomberg, reports") — never cite an outlet you were not given as if you had read it.
+- Keep the specifics the sources give: figures, prices, dates, company and product names.
+- When sources disagree or a claim is unverified, say so plainly.
+- A source marked [feed snippet only] is a headline and a teaser, not the full story: cite it only for what it literally says.
+
+ON YOUR BEAT OR NOT:
+- First decide whether this story has a real, direct consequence for the readers of your beat. A big AI headline with only a stretched link to your beat is NOT on your beat.
+- If it is not, return ONLY {"on_beat": false} and nothing else. Another story will be tried.
+
+STRUCTURE (markdown, 450-700 words):
+1. An opening paragraph, no heading: the news and its single most important fact, in 2-3 sentences.
+2. "## What happened" — the facts, attributed, with the specifics.
+3. "## Why it matters for <the reader of your beat>" — e.g. "for sales teams", "for small HR teams". Take a clear position in your editorial voice and argue it from the facts. This is the part a reader cannot get from the source.
+4. "## What to do this week" — exactly 3 numbered, concrete actions a small team can take in a few hours, each one sentence or two. No generic advice ("stay informed", "monitor the space").
+Do not add a sources list, a conclusion heading or a call to action: the sources are appended automatically.
 
 SEO RULES:
 - seo_title: Different from the article title, shorter, keyword-focused, max 60 chars
@@ -293,10 +356,10 @@ SEO RULES:
 
 Return ONLY valid JSON:
 {
-  "title": "article title",
+  "on_beat": true,
+  "title": "article title — specific, no clickbait",
   "summary": "1-2 sentence summary, max 200 characters",
-  "body": "full article body, use plain text with paragraph breaks using \\n\\n",
-  "source_url": "URL of the original news",
+  "body": "full article body in markdown as described, paragraphs separated by \\n\\n",
   "seo_title": "SEO-optimized title, max 60 characters",
   "meta_description": "meta description, max 155 characters",
   "tags": ["tag1", "tag2", "tag3"],
@@ -304,26 +367,29 @@ Return ONLY valid JSON:
   "geo_country_code": "2-letter ISO code or null"
 }
 
-CRITICAL: The "body" field must be a single JSON string. Use \\n\\n for paragraph breaks. Do NOT use markdown headers. Do NOT break out of the JSON string.`,
+CRITICAL: The "body" field must be a single JSON string. Use \\n for line breaks inside it. Do NOT break out of the JSON string.`,
       },
       {
         role: 'user',
-        content: `Here are today's top AI news stories. Pick the best one and write an original article in English:\n\n${newsList}`,
+        content: `Write the article from these sources:\n\n${formatStoryForPrompt(story)}`,
       },
     ],
-    temperature: 0.7,
+    temperature: 0.5,
     max_tokens: 8192,
     response_format: { type: 'json_object' },
-  }, makeJsonContentValidator(['title', 'body']));
+  }, makeJsonContentValidator(['on_beat']));
 
   const content = response.choices[0].message.content;
   const parsed = extractJSON(content);
+
+  if (parsed.on_beat === false) return { offBeat: true };
+  if (!parsed.title || !parsed.body) throw new Error('missing title or body');
 
   return {
     title: parsed.title,
     summary: (parsed.summary || '').slice(0, 490),
     body: parsed.body,
-    source_url: parsed.source_url || newsItems[0]?.link || null,
+    source_url: story.main.link || null,
     seo_title: (parsed.seo_title || '').slice(0, 70) || null,
     meta_description: (parsed.meta_description || '').slice(0, 160) || null,
     tags: Array.isArray(parsed.tags) ? parsed.tags.filter(t => typeof t === 'string').slice(0, 10) : [],
@@ -340,18 +406,18 @@ async function translateArticle(article, langName) {
     messages: [
       {
         role: 'system',
-        content: `You are a professional translator. Translate the given article into ${langName}. Keep the same tone, style, and structure.
+        content: `You are a professional translator. Translate the given article into ${langName}. Keep the same tone, style, and structure: keep every markdown "## " heading (translate its text), every numbered list item and every [link](url) exactly as markdown, with the URLs unchanged.
 
 Return ONLY valid JSON with these 5 string fields:
 {
   "title": "translated title",
   "summary": "translated summary, max 200 characters",
-  "body": "translated full article body, use \\n\\n for paragraph breaks",
+  "body": "translated full article body in the same markdown, paragraphs separated by \\n\\n",
   "seo_title": "translated SEO title, max 60 characters",
   "meta_description": "translated meta description, max 155 characters"
 }
 
-CRITICAL: The "body" field must be a single JSON string. Use \\n\\n for paragraph breaks. Do NOT use markdown headers. Do NOT break out of the JSON string.`,
+CRITICAL: The "body" field must be a single JSON string. Use \\n for line breaks inside it. Do NOT break out of the JSON string.`,
       },
       {
         role: 'user',
@@ -1172,7 +1238,7 @@ async function findFeaturedImage(title, body, tags, usedPhotoKeys = new Set()) {
 }
 
 /** Credit-line label per published language. */
-const PHOTO_CREDIT_LABEL = { en: 'Photo', es: 'Foto', zh: '图片', it: 'Foto', fr: 'Photo' };
+const PHOTO_CREDIT_LABEL = { en: 'Photo', es: 'Foto', zh: '图片', it: 'Foto', fr: 'Photo', de: 'Foto', nl: 'Foto', pl: 'Zdjęcie' };
 
 /**
  * Render the photographer credit line. Unsplash's API guidelines require
@@ -1217,7 +1283,7 @@ async function main() {
   console.log(`[${new Date().toISOString()}] News agent starting...`);
   console.log(`  LLM providers: ${LLM_PROVIDERS.map(p => `${p.name} (${p.model})`).join(' → ')}`);
 
-  await sendHeartbeat();
+  if (!DRY_RUN) await sendHeartbeat();
 
   // Try to use cached fresh items first (resilience for retries after LLM failures)
   let freshItems = readCache();
@@ -1262,24 +1328,32 @@ async function main() {
 
   console.log(`Found ${freshItems.length} fresh items. Generating article...`);
 
-  // Step 1: Generate original article in English (retry if title is duplicate)
+  // Step 1: read a story's sources, then write the article in English from
+  // them. Retries move to the next readable story when the model wrote a
+  // duplicate title or skipped a required section.
   let article = null;
-  let remainingItems = [...freshItems];
-  const MAX_GENERATE_ATTEMPTS = 3;
+  let story = null;
+  const candidates = freshItems.slice(0, MAX_CANDIDATES);
+  const tried = new Set();
+  // Four model calls at most: an off-beat story costs one too.
+  const MAX_GENERATE_ATTEMPTS = 4;
 
   for (let attempt = 1; attempt <= MAX_GENERATE_ATTEMPTS; attempt++) {
-    if (remainingItems.length === 0) {
-      console.log('No more fresh items to try. Exiting.');
+    story = await readNextStory(candidates, freshItems, tried);
+    if (!story) {
+      console.log('No readable source among the candidates. Exiting without publishing.');
       return;
     }
-
-    console.log(`Generating article in English (attempt ${attempt}/${MAX_GENERATE_ATTEMPTS})...`);
+    console.log(`Generating article in English (attempt ${attempt}/${MAX_GENERATE_ATTEMPTS}) from ${story.main.link}` +
+      (story.related.length ? ` + ${story.related.length} other source(s)` : ''));
 
     let candidate;
     try {
-      candidate = await generateArticle(remainingItems);
+      candidate = await generateArticle(story);
     } catch (err) {
       console.warn(`  Article generation failed: ${err.message}`);
+      // The story was fine, the model chain wasn't: try the same one again.
+      tried.delete(story.main.link);
       if (attempt < MAX_GENERATE_ATTEMPTS) {
         console.log('  Retrying...');
         continue;
@@ -1287,19 +1361,36 @@ async function main() {
       throw err;
     }
 
+    if (candidate.offBeat) {
+      console.log('  Story is off this agent\'s beat. Trying the next one...');
+      continue;
+    }
+
+    if (!hasRequiredSections(candidate.body)) {
+      console.log('  Article is missing a required section. Retrying...');
+      tried.delete(story.main.link);
+      continue;
+    }
+
     if (!isDuplicate(candidate.title, allArticles, candidate.source_url)) {
       article = candidate;
       break;
     }
 
-    console.log(`  Duplicate detected: "${candidate.title}". Retrying with different items...`);
-    // Remove the source item the LLM picked so it tries a different one
-    remainingItems = remainingItems.filter((item) => item.link !== candidate.source_url);
+    console.log(`  Duplicate detected: "${candidate.title}". Retrying with a different story...`);
     allArticles.push({ title: candidate.title, source_url: candidate.source_url });
   }
 
   if (!article) {
-    console.log('Could not generate a non-duplicate article after all attempts. Exiting.');
+    console.log('Could not generate a usable article after all attempts. Exiting.');
+    return;
+  }
+
+  // The stories the article was written from, as links under it.
+  const sources = [story.main, ...story.related];
+
+  if (DRY_RUN) {
+    console.log(`\n${'='.repeat(60)}\n# ${article.title}\n\n${appendSources(article.body, sources, 'en')}\n${'='.repeat(60)}`);
     return;
   }
 
@@ -1320,6 +1411,9 @@ async function main() {
     { code: 'zh', name: 'Simplified Chinese' },
     { code: 'it', name: 'Italian' },
     { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'nl', name: 'Dutch' },
+    { code: 'pl', name: 'Polish' },
   ];
 
   // Stock photos already on recent articles (own + all agents), so two agents
@@ -1362,6 +1456,13 @@ async function main() {
 
   // Photographer credit, appended after translation so the line itself is not
   // run through the model (and so every language gets the same names/links).
+  // Sources first, photo credit last: both appended in code, after
+  // translation, so the links and names are identical in every language.
+  article.body = appendSources(article.body, sources, 'en');
+  for (const [code, translation] of Object.entries(translations)) {
+    translation.body = appendSources(translation.body, sources, code);
+  }
+
   if (imageCredit) {
     article.body = appendPhotoCredit(article.body, imageCredit, 'en');
     for (const [code, translation] of Object.entries(translations)) {

@@ -9,6 +9,7 @@ import { RSS_SOURCES, getSourcesForCategory } from './rss-sources.js';
 import { getAllAgents, getRssSources, AGENT_KEY_ENV } from './agents-config.js';
 import { isDuplicate, photoKeyFromUrl, photoKeySuffix, collectUsedPhotoKeys } from './dedup.js';
 import { BATCHES, resolveCategories } from './run-news.js';
+import { extractArticleText, findRelatedItems, formatSources, appendSources, hasRequiredSections, fetchSourceText } from './source-text.js';
 import { EXIT_FAILED, EXIT_PUBLISH_FAILED } from './exit-codes.js';
 import { shuffle, pick } from './random.js';
 import {
@@ -442,7 +443,7 @@ describe('Photo credit', () => {
   });
 
   it('falls back to English for an unknown language', () => {
-    assert.ok(formatPhotoCredit(credit, 'de').startsWith('Photo: '));
+    assert.ok(formatPhotoCredit(credit, 'ja').startsWith('Photo: '));
   });
 
   it('omits the link when the provider gave none', () => {
@@ -638,5 +639,60 @@ describe('Publish retry rule', () => {
     for (const status of [400, 401, 403, 404, 409, 413, 422]) {
       assert.ok(!isRetryableHttpStatus(status), `${status} should not be retried`);
     }
+  });
+});
+
+describe('Source text', () => {
+  const para = (n) => `<p>${'Paragraph ' + n + ' carries enough words to count as real prose in a news story. '.repeat(2)}</p>`;
+
+  it('reads the <article> prose and drops scripts, navigation and short lines', () => {
+    const html = `<html><body><nav><p>${'Menu link text that is long enough to pass the filter '.repeat(2)}</p></nav>
+      <article><h1>T</h1><p>By Jane</p>${para(1)}<script>var x = "<p>not prose</p>";</script>${para(2)}</article>
+      <footer>${para(9)}</footer></body></html>`;
+    const text = extractArticleText(html);
+    assert.equal(text.split('\n\n').length, 2);
+    assert.match(text, /^Paragraph 1/);
+    assert.doesNotMatch(text, /Menu|not prose|Paragraph 9|By Jane/);
+  });
+
+  it('decodes entities and caps the length', () => {
+    assert.match(extractArticleText(`<p>${'AT&amp;T&#39;s &ldquo;deal&rdquo; is worth discussing at length here. '.repeat(2)}</p>`), /AT&T's “deal”/);
+    assert.ok(extractArticleText([1, 2, 3, 4, 5].map(para).join(''), 400).length <= 400);
+  });
+
+  it('finds other publishers covering the same story, one per publisher', () => {
+    const main = { title: 'OpenAI launches workspace agents for enterprise teams', link: 'https://techcrunch.com/a' };
+    const pool = [
+      main,
+      { title: 'OpenAI workspace agents arrive for enterprise customers', link: 'https://www.theverge.com/b' },
+      { title: 'Enterprise teams get OpenAI workspace agents', link: 'https://theverge.com/c' },
+      { title: 'OpenAI workspace agents: what enterprise teams get', link: 'https://techcrunch.com/d' },
+      { title: 'Nvidia earnings beat expectations', link: 'https://reuters.com/e' },
+    ];
+    const related = findRelatedItems(main, pool);
+    // c shares more words than b; both are The Verge, so only the better one.
+    assert.deepEqual(related.map((r) => r.link), ['https://theverge.com/c']);
+  });
+
+  it('appends a sources list with the same links in every language', () => {
+    const sources = [{ title: 'A [story]', link: 'https://a.com/1', source: 'A News' }, { title: 'B', link: 'https://b.com/2' }];
+    assert.equal(formatSources(sources, 'it'), '## Fonti\n\n- [A story](https://a.com/1) — A News\n- [B](https://b.com/2)');
+    assert.equal(appendSources('Body\n', [], 'en'), 'Body\n');
+    assert.match(appendSources('Body', sources, 'zh'), /^Body\n\n## 来源/);
+  });
+
+  it('requires the three sections', () => {
+    const ok = 'Intro\n\n## What happened\nx\n\n## Why it matters for sales teams\ny\n\n## What to do this week\n1. z';
+    assert.equal(hasRequiredSections(ok), true);
+    assert.equal(hasRequiredSections(ok.replace('## What to do this week', 'What to do')), false);
+  });
+
+  it('returns null for pages it cannot read, never throws', async () => {
+    const page = (body, type = 'text/html') => async () => new Response(body, { headers: { 'content-type': type } });
+    assert.equal(await fetchSourceText('https://x.com', { fetchImpl: page([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(para).join('')) }) !== null, true);
+    assert.equal(await fetchSourceText('https://x.com', { fetchImpl: page(para(1)) }), null);
+    assert.equal(await fetchSourceText('https://x.com', { fetchImpl: page('{}', 'application/json') }), null);
+    assert.equal(await fetchSourceText('https://x.com', { fetchImpl: async () => { throw new Error('boom'); } }), null);
+    assert.equal(await fetchSourceText('https://x.com', { fetchImpl: async () => new Response('no', { status: 403 }) }), null);
   });
 });
