@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { RSS_SOURCES, getSourcesForCategory } from './rss-sources.js';
 import { getAllAgents, getRssSources, AGENT_KEY_ENV } from './agents-config.js';
 import { isDuplicate, photoKeyFromUrl, photoKeySuffix, collectUsedPhotoKeys } from './dedup.js';
-import { BATCHES, resolveCategories } from './run-news.js';
+import { BATCHES, PAUSED, publishesToday, resolveCategories } from './run-news.js';
 import { extractArticleText, findRelatedItems, formatSources, appendSources, hasRequiredSections, fetchSourceText } from './source-text.js';
 import { EXIT_FAILED, EXIT_PUBLISH_FAILED } from './exit-codes.js';
 import { shuffle, pick } from './random.js';
@@ -543,13 +543,29 @@ describe('Environment Config', () => {
 describe('News batches', () => {
   const batched = Object.values(BATCHES).flat();
 
-  it('covers every category exactly once', () => {
+  it('schedules or pauses every category exactly once', () => {
     const known = Object.keys(AGENT_KEY_ENV).sort();
     assert.deepEqual(
-      [...batched].sort(),
+      [...batched, ...PAUSED].sort(),
       known,
-      'BATCHES must cover every category in AGENT_KEY_ENV, with no duplicates'
+      'BATCHES + PAUSED must cover every category in AGENT_KEY_ENV, with no duplicates'
     );
+  });
+
+  it('schedules only the categories the site indexes', () => {
+    const indexed = ['sales', 'marketing', 'lead_generation', 'customer_support', 'hr_recruiting', 'operations', 'finance',
+      'revops', 'automation', 'workflows', 'ai_agents', 'new_tools', 'use_cases', 'playbooks', 'future_of_work', 'digital_labor'];
+    assert.deepEqual([...batched].sort(), [...indexed].sort());
+  });
+
+  it('publishes each scheduled category every other day, half the schedule a day', () => {
+    const day = new Date('2026-11-25T06:07:00Z');
+    const next = new Date('2026-11-26T06:07:00Z');
+    const today = batched.filter((c) => publishesToday(c, day));
+    const tomorrow = batched.filter((c) => publishesToday(c, next));
+    assert.equal(today.length, batched.length / 2);
+    assert.deepEqual([...today, ...tomorrow].sort(), [...batched].sort());
+    assert.equal(publishesToday('robotics', day) || publishesToday('robotics', next), false);
   });
 
   it('every agent has an API key env var mapped', () => {
@@ -566,11 +582,13 @@ describe('News batches', () => {
   });
 
   it('resolveCategories expands "all"', () => {
-    assert.equal(resolveCategories({ NEWS_CATEGORIES: 'all' }).length, batched.length);
+    assert.equal(resolveCategories({ NEWS_CATEGORIES: 'all' }).length, Object.keys(AGENT_KEY_ENV).length);
   });
 
-  it('resolveCategories reads a batch key', () => {
-    assert.deepEqual(resolveCategories({ NEWS_BATCH: '12' }), BATCHES[12]);
+  it('resolveCategories reads a batch key, today\u2019s half of it', () => {
+    const now = new Date('2026-11-25T06:07:00Z');
+    assert.deepEqual(resolveCategories({ NEWS_BATCH: '6' }, now), BATCHES[6].filter((c) => publishesToday(c, now)));
+    assert.equal(resolveCategories({ NEWS_BATCH: '6' }, now).length, 2);
   });
 
   it('resolveCategories rejects unknown input', () => {

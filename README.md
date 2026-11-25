@@ -8,6 +8,14 @@ Agents publish in hourly batches — every agent in a batch runs back-to-back
 starting at :07 of that hour. Batches are defined in `BATCHES` in
 `src/run-news.js`.
 
+**Since 2026-11-25** only the 16 on-topic categories are scheduled (06–09 UTC),
+each on alternate days (~8 articles a day): the ones VEII indexes in search
+(`NEWS_INDEXED_CATEGORIES` in the veii repo). IT & Security, Tech Trends,
+Strategy, Agent Builders, Challenges, Growth, AI + Humans, Agent Economy,
+Funding, Crypto Trading and Robotics are paused (`PAUSED`): their agents and
+past articles stay, and `NEWS_CATEGORIES=<name>` still runs one by hand. The
+batch hours in the table below are the old schedule.
+
 | Agent                                             | Category         | Batch (UTC) | Personality                           |
 | ------------------------------------------------- | ---------------- | ----------- | ------------------------------------- |
 | **RevOps Signal** (`revops-signal`)               | RevOps           | 06:07       | Analytical, systems-thinking          |

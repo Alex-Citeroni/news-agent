@@ -15,9 +15,7 @@ on:
     - cron: "7 7 * * *"
     - cron: "7 8 * * *"
     - cron: "7 9 * * *"
-    - cron: "7 10 * * *"
-    - cron: "7 11 * * *"
-    - cron: "7 12 * * *"
+    # 10–12 UTC retired 2026-11-25: their categories are paused (PAUSED in src/run-news.js).
   workflow_dispatch:
     inputs:
       categories:

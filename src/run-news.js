@@ -34,28 +34,50 @@ const INDEX_PATH = process.env.NEWS_INDEX_PATH
   || fileURLToPath(new URL('./index.js', import.meta.url));
 
 /**
- * Categories grouped by the UTC hour they publish in.
+ * Categories grouped by the UTC hour they publish in — the ON-TOPIC ones only
+ * (2026-11-25): the work VEII's apps do. The site indexes news in exactly these
+ * categories (`NEWS_INDEXED_CATEGORIES` in veii's src/lib/seo/news-indexing.ts);
+ * keep the two lists the same.
  *
- * These groups mirror the old per-category crons (which fired at :07, :22,
- * :37 and :52 between 06:00 and 12:00 UTC), so articles still appear spread
- * across the morning instead of all at once. Order within a batch is the old
- * minute order.
+ * Why: 27 agents publishing daily put ~23 machine-written articles a day on a
+ * business-software site, half of them on robotics, crypto, funding rounds,
+ * security breaches or AI policy. Google reads that volume as scaled content
+ * and it blurs what the site is about. Fewer, on-topic pieces it is.
  */
 export const BATCHES = {
   6: ['revops', 'new_tools', 'sales', 'marketing'],
-  7: ['lead_generation', 'hr_recruiting', 'it_security', 'tech_trends'],
-  8: ['operations', 'strategy', 'finance', 'ai_agents'],
-  9: ['workflows', 'automation', 'customer_support', 'agent_builders'],
-  10: ['challenges', 'use_cases', 'growth', 'playbooks'],
-  11: ['ai_humans', 'future_of_work', 'digital_labor', 'agent_economy'],
-  12: ['funding', 'crypto_trading', 'robotics'],
+  7: ['lead_generation', 'hr_recruiting', 'operations', 'finance'],
+  8: ['ai_agents', 'workflows', 'automation', 'customer_support'],
+  9: ['use_cases', 'playbooks', 'future_of_work', 'digital_labor'],
 };
+
+/**
+ * Agents that still exist (their accounts, keys and past articles stay) but no
+ * longer publish on a schedule. Run one by hand with NEWS_CATEGORIES if needed.
+ */
+export const PAUSED = [
+  'it_security', 'tech_trends', 'strategy', 'agent_builders', 'challenges',
+  'growth', 'ai_humans', 'agent_economy', 'funding', 'crypto_trading', 'robotics',
+];
+
+/**
+ * Each scheduled category publishes every other day, alternating with its
+ * neighbour in the schedule, so a batch of four puts out two a day and the
+ * whole schedule ~8 a day instead of 16. Day = UTC days since the epoch.
+ */
+export function publishesToday(category, now = new Date()) {
+  const order = Object.values(BATCHES).flat();
+  const i = order.indexOf(category);
+  if (i === -1) return false;
+  const day = Math.floor(now.getTime() / 86_400_000);
+  return (day + i) % 2 === 0;
+}
 
 /**
  * Resolve the list of categories to run from the environment.
  * Throws with an actionable message when the selection is missing or invalid.
  */
-export function resolveCategories(env = process.env) {
+export function resolveCategories(env = process.env, now = new Date()) {
   const known = Object.keys(AGENT_KEY_ENV);
   const raw = (env.NEWS_CATEGORIES || '').trim();
 
@@ -80,7 +102,8 @@ export function resolveCategories(env = process.env) {
         `Unknown NEWS_BATCH "${batch}". Valid batches: ${Object.keys(BATCHES).join(', ')}`
       );
     }
-    return list;
+    // A scheduled batch runs today's half; an explicit NEWS_CATEGORIES runs as asked.
+    return list.filter((c) => publishesToday(c, now));
   }
 
   throw new Error(
